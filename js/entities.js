@@ -76,9 +76,11 @@ const MOBS = {
   sheep: { w: 0.45, h: 1.25, hp: 8, speed: 1.1, drops: [[B.WOOL, 1, 1], [I.RAW_MUTTON, 1, 2]], sound: 'sheep', passive: true },
   zombie: { w: 0.3, h: 1.9, hp: 20, speed: 2.4, drops: [[I.ROTTEN_FLESH, 0, 2]], sound: 'zombie', hostile: true, dmg: 3 },
   creeper: { w: 0.3, h: 1.7, hp: 20, speed: 2.2, drops: [[I.GUNPOWDER, 0, 2]], sound: 'hiss', hostile: true },
+  villager: { w: 0.3, h: 1.95, hp: 20, speed: 1.1, drops: [], sound: 'villager', passive: true, villager: true },
+  iron_golem: { w: 0.65, h: 2.7, hp: 100, speed: 1.5, drops: [[I.IRON_INGOT, 3, 5], [B.POPPY, 0, 2]], golem: true, dmg: 7 },
   skeleton: { w: 0.3, h: 1.9, hp: 20, speed: 2.2, drops: [[I.BONE, 0, 2], [I.ARROW, 0, 2]], sound: 'zombie', hostile: true, dmg: 2 },
 };
-function buildModel(type) {
+function buildModel(type, opts = {}) {
   const mats = [], g = new THREE.Group(), legs = []; let head, arms = [];
   const quad = (bw, bh, bd, by, color, legH, legC, headSize, headC, headPos) => {
     const body = box(bw, bh, bd, color, mats); body.position.y = legH + bh / 2; g.add(body);
@@ -101,6 +103,30 @@ function buildModel(type) {
   } else if (type === 'sheep') {
     quad(0.72, 0.6, 1.0, 0, 0xf2f2f2, 0.55, 0xd8c8b8, 0.42, 0xd8c8b8, [0, 1.05, 0.6]);
     for (const s of [-1, 1]) { const e = box(0.07, 0.07, 0.02, 0x111111, mats); e.position.set(s * 0.12, 0.06, 0.2); head.add(e); }
+  } else if (type === 'villager') {
+    const robe = { farmer: 0x8a5a2a, librarian: 0xe8e8e0, smith: 0x2a2a2e, cleric: 0x6a2a8a, butcher: 0xeeeeee, shepherd: 0x6a4a2a, mason: 0x5a5a6a, nitwit: 0x3a8a3a }[opts.prof] ?? 0x8a5a2a;
+    const skinV = 0xb88660;
+    const body = box(0.5, 0.95, 0.32, robe, mats); body.position.y = 1.02; g.add(body);
+    const apron = { farmer: 0xc8a050, smith: 0x111111, butcher: 0xd83a3a, librarian: 0xa07040, cleric: 0x9a4aba, shepherd: 0xe8e8e8, mason: 0x9a6a4a }[opts.prof];
+    if (apron !== undefined) { const ap = box(0.4, 0.6, 0.02, apron, mats); ap.position.set(0, 0.95, 0.17); g.add(ap); }
+    for (const s of [-1, 1]) { const l = pivot(box(0.22, 0.6, 0.22, 0x3a2a1a, mats), s * 0.12, 0.6, 0, -0.3); g.add(l); legs.push(l); }
+    const ar = box(0.66, 0.2, 0.2, skinV, mats); ar.position.set(0, 1.2, 0.2); ar.rotation.x = -0.4; g.add(ar);
+    head = new THREE.Group(); head.position.set(0, 1.72, 0); head.add(box(0.44, 0.52, 0.44, skinV, mats)); g.add(head);
+    const nose = box(0.1, 0.18, 0.1, 0xa87250, mats); nose.position.set(0, -0.04, 0.27); head.add(nose);
+    const brow = box(0.36, 0.05, 0.02, 0x3a2a1a, mats); brow.position.set(0, 0.11, 0.225); head.add(brow);
+    for (const s of [-1, 1]) { const e = box(0.08, 0.06, 0.02, 0x2a7a2a, mats); e.position.set(s * 0.1, 0.05, 0.225); head.add(e); }
+    if (opts.prof === 'farmer') { const hat = box(0.6, 0.06, 0.6, 0xd8c060, mats); hat.position.y = 0.28; head.add(hat); }
+    if (opts.prof === 'librarian') { const hat = box(0.46, 0.14, 0.46, 0xa07040, mats); hat.position.y = 0.3; head.add(hat); }
+  } else if (type === 'iron_golem') {
+    const iron = 0xd8d0c8, dark = 0xa89c90;
+    const body = box(0.95, 0.85, 0.55, iron, mats); body.position.y = 1.75; g.add(body);
+    const hip = box(0.6, 0.3, 0.4, dark, mats); hip.position.y = 1.2; g.add(hip);
+    const vine = box(0.3, 0.5, 0.02, 0x4a8a2a, mats); vine.position.set(0.15, 1.7, 0.28); g.add(vine);
+    for (const s of [-1, 1]) { const l = pivot(box(0.32, 1.05, 0.32, dark, mats), s * 0.2, 1.05, 0, -0.525); g.add(l); legs.push(l); }
+    for (const s of [-1, 1]) { const a = pivot(box(0.26, 1.35, 0.3, iron, mats), s * 0.62, 2.1, 0, -0.62); g.add(a); arms.push(a); }
+    head = new THREE.Group(); head.position.set(0, 2.38, 0.06); head.add(box(0.42, 0.42, 0.42, iron, mats)); g.add(head);
+    const nose = box(0.1, 0.2, 0.1, dark, mats); nose.position.set(0, -0.06, 0.25); head.add(nose);
+    for (const s of [-1, 1]) { const e = box(0.08, 0.05, 0.02, 0x8a1a1a, mats); e.position.set(s * 0.1, 0.06, 0.215); head.add(e); }
   } else {
     const skin = type === 'zombie' ? 0x5f9a4a : type === 'creeper' ? 0x58b84a : 0xc8c8c8;
     if (type === 'creeper') {
@@ -212,20 +238,24 @@ export class EntityManager {
     this.falling.push({ id, x: x + 0.5, y, z: z + 0.5, vx: 0, vy: 0, vz: 0, w: 0.49, h: 0.98, mesh });
   }
   // ---------- mobs ----------
-  spawnMob(type, x, y, z) {
-    const def = MOBS[type]; const model = buildModel(type);
+  spawnMob(type, x, y, z, opts = {}) {
+    const def = MOBS[type];
+    if (type === 'villager' && !opts.prof) opts.prof = ['farmer', 'librarian', 'smith', 'cleric', 'butcher', 'shepherd', 'mason', 'nitwit'][Math.floor(Math.random() * 8)];
+    const model = buildModel(type, opts);
     this.scene.add(model.g);
     const m = { type, def, model, x, y, z, vx: 0, vy: 0, vz: 0, w: def.w, h: def.h, hp: def.hp, yaw: Math.random() * 6.28, targetYaw: 0,
-      walk: 0, wanderT: 0, moving: false, hurt: 0, attackCd: 0, fuse: 0, onGround: false, dead: 0, sayT: 4 + Math.random() * 10, burn: 0, shootCd: 2 };
+      walk: 0, wanderT: 0, moving: false, hurt: 0, attackCd: 0, fuse: 0, onGround: false, dead: 0, sayT: 4 + Math.random() * 10, burn: 0, shootCd: 2, prof: opts.prof, home: opts.home || null, plan: opts.plan || null };
     this.mobs.push(m); return m;
   }
-  hurtMob(m, dmg, fromX, fromZ) {
+  hurtMob(m, dmg, fromX, fromZ, fromPlayer = true) {
     if (m.dead || m.hurt > 0.35) return false;
     m.hp -= dmg; m.hurt = 0.5;
     const dx = m.x - fromX, dz = m.z - fromZ, d = Math.hypot(dx, dz) || 1;
     m.vx += dx / d * 6; m.vz += dz / d * 6; m.vy = 5;
     sfx.hit(); if (m.def.sound && m.def.passive) sfx[m.def.sound]();
     if (m.def.passive) m.panic = 5;
+    if (m.def.golem) { sfx.golem(); if (fromPlayer) m.angry = 20; }
+    if (m.def.villager && fromPlayer) { for (const o of this.mobs) if (o.def.golem && Math.hypot(o.x - m.x, o.z - m.z) < 24) o.angry = 20; }
     if (m.hp <= 0) {
       m.dead = 0.8;
       for (const [id, a, b] of m.def.drops) {
@@ -242,7 +272,7 @@ export class EntityManager {
     for (let i = this.mobs.length - 1; i >= 0; i--) {
       const m = this.mobs[i]; const md = m.def;
       const dxp = pl.x - m.x, dzp = pl.z - m.z, distP = Math.hypot(dxp, dzp, (pl.y - m.y));
-      if (distP > 80 || (md.hostile && g.difficulty === 0)) { this.scene.remove(m.model.g); this.mobs.splice(i, 1); continue; }
+      if (distP > (m.home ? 140 : 80) || (md.hostile && g.difficulty === 0)) { this.scene.remove(m.model.g); this.mobs.splice(i, 1); continue; }
       if (m.dead > 0) {
         m.dead -= dt; m.model.g.rotation.z = Math.min(Math.PI / 2, (0.8 - m.dead) * 4);
         if (m.dead <= 0) { this.burst(m.x, m.y + 0.5, m.z, [0.9, 0.9, 0.9], 16, 2, 0.15); this.scene.remove(m.model.g); this.mobs.splice(i, 1); }
@@ -251,17 +281,40 @@ export class EntityManager {
       if (!w.isLoaded(Math.floor(m.x), Math.floor(m.z))) continue;
       m.hurt = Math.max(0, m.hurt - dt); m.attackCd -= dt; m.sayT -= dt;
       if (m.sayT < 0 && distP < 16) { m.sayT = 8 + Math.random() * 14; if (md.sound && m.type !== 'creeper') sfx[md.sound](); }
-      let speed = 0; let chase = false;
+      let speed = 0; let chase = false; let target = null;
       const playerTargetable = g.mode === 'survival' && !pl.dead;
-      if (md.hostile && playerTargetable && distP < 18) {
+      if (md.golem) {
+        m.angry = Math.max(0, (m.angry || 0) - dt);
+        if (m.angry > 0 && playerTargetable && distP < 20) target = pl;
+        else { m.tgtT = (m.tgtT || 0) - dt; if (m.tgtT < 0 || (m.tgt && m.tgt.dead)) { m.tgtT = 0.5; m.tgt = this.nearest(m, (o) => o.def.hostile && !o.dead, 16); } target = m.tgt; }
+      } else if (m.type === 'zombie' && !(playerTargetable && distP < 18)) {
+        m.tgtT = (m.tgtT || 0) - dt; if (m.tgtT < 0) { m.tgtT = 1; m.tgt = this.nearest(m, (o) => o.def.villager && !o.dead, 14); } target = m.tgt && !m.tgt.dead ? m.tgt : null;
+      }
+      if (target && target !== pl) {
+        const tx = target.x - m.x, tz = target.z - m.z, td = Math.hypot(tx, tz);
+        m.targetYaw = Math.atan2(tx, tz); speed = md.speed * (md.golem ? 1.2 : 1);
+        if (td < (md.golem ? 2.2 : 1.4) && m.attackCd <= 0) {
+          m.attackCd = md.golem ? 1.2 : 1; this.hurtMob(target, md.golem ? 10 + Math.random() * 6 : md.dmg, m.x, m.z, false);
+          if (md.golem) { target.vy = 9; m.swingT = 0.4; }
+          if (target.def.villager) target.panic = 6;
+        }
+        if (td < 1.2) speed = 0;
+      } else if ((md.hostile || target === pl) && playerTargetable && distP < 18) {
         chase = true; m.targetYaw = Math.atan2(dxp, dzp);
         speed = md.speed;
         if (m.type === 'skeleton' && distP < 8) speed = 0;
+        if (md.golem) { speed = md.speed * 1.2; if (distP < 2.4 && m.attackCd <= 0) { m.attackCd = 1.4; m.swingT = 0.4; g.damagePlayer(md.dmg * [0.5, 0.7, 1, 1.4][g.difficulty], m.x, m.z); pl.vy = 8; } }
       } else {
         m.wanderT -= dt;
         if (m.wanderT < 0) { m.wanderT = 2 + Math.random() * 5; m.moving = Math.random() < 0.55; m.targetYaw = Math.random() * Math.PI * 2; }
         if (m.panic > 0) { m.panic -= dt; m.moving = true; if (Math.random() < dt * 2) m.targetYaw = Math.random() * 6.28; }
         speed = m.moving ? md.speed * (m.panic > 0 ? 2 : 0.6) : 0;
+        // stay near home (villagers / golems)
+        if (m.home && !(m.panic > 0)) {
+          const hx = m.home.x - m.x, hz = m.home.z - m.z, hd = Math.hypot(hx, hz);
+          if (hd > (md.golem ? 22 : 14)) { m.targetYaw = Math.atan2(hx, hz); m.moving = true; speed = md.speed * 0.7; }
+        }
+        if (md.villager && m.lookP > 0) { m.lookP -= dt; speed = 0; m.targetYaw = Math.atan2(dxp, dzp); }
       }
       let dy = m.targetYaw - m.yaw; while (dy > Math.PI) dy -= Math.PI * 2; while (dy < -Math.PI) dy += Math.PI * 2;
       m.yaw += dy * Math.min(1, dt * 6);
@@ -283,12 +336,12 @@ export class EntityManager {
         } else if (m.type === 'skeleton') {
           m.shootCd -= dt;
           if (m.shootCd < 0 && distP < 16) { m.shootCd = 2 + Math.random(); this.shootArrow(m, pl); }
-        } else if (distP < 1.4 && m.attackCd <= 0) { m.attackCd = 1; g.damagePlayer(md.dmg * [0, 0.5, 1, 1.5][g.difficulty], m.x, m.z); }
+        } else if (md.golem) { /* handled above */ } else if (distP < 1.4 && m.attackCd <= 0) { m.attackCd = 1; g.damagePlayer(md.dmg * [0, 0.5, 1, 1.5][g.difficulty], m.x, m.z); }
       } else if (m.type === 'creeper') { m.fuse = 0; m.model.g.scale.set(1, 1, 1); }
       // burn in daylight
       if (md.hostile && m.type !== 'creeper' && g.daylight > 0.75 && !inWater && w.topSolid(Math.floor(m.x), Math.floor(m.z)) < m.y + m.h) {
         m.burn += dt; if (Math.random() < dt * 8) this.burst(m.x, m.y + 1.2, m.z, [1, 0.5, 0.1], 2, 1, 0.1, 0.4);
-        if (m.burn > 1) { m.burn = 0; this.hurtMob(m, 1, m.x, m.z); }
+        if (m.burn > 1) { m.burn = 0; this.hurtMob(m, 1, m.x, m.z, false); }
       }
       // cactus / lava
       // animate
@@ -296,6 +349,7 @@ export class EntityManager {
       const sw = Math.sin(m.walk) * Math.min(1, sp) * 0.7;
       m.model.legs.forEach((l, k) => { l.rotation.x = (k % 2 === (k < 2 ? 0 : 1) ? sw : -sw); });
       if (m.model.legs.length === 2) { m.model.legs[0].rotation.x = sw; m.model.legs[1].rotation.x = -sw; }
+      if (md.golem) { m.swingT = Math.max(0, (m.swingT || 0) - dt); const up = m.swingT > 0 ? -Math.sin(m.swingT / 0.4 * Math.PI) * 2 : 0; m.model.arms.forEach((a, k) => { a.rotation.x = up + (k ? sw : -sw) * 0.6; }); }
       m.model.g.position.set(m.x, m.y, m.z); m.model.g.rotation.y = m.yaw;
       const tint = m.hurt > 0.3 ? 0x991111 : (m.fuse > 0 && Math.sin(m.fuse * 20) > 0 ? 0x666666 : 0);
       if (m.lastTint !== tint) { for (const mt of m.model.mats) mt.emissive.setHex(tint); m.lastTint = tint; }
@@ -351,6 +405,11 @@ export class EntityManager {
         if (cur === 0 || LIQUID[cur] || BLOCKS[cur].shape === 'cross') g.setBlock(bx, by, bz, f.id); else this.dropItem(f.id, 1, f.x, f.y + 0.5, f.z);
       }
     }
+  }
+  nearest(m, pred, maxD) {
+    let best = null, bd = maxD;
+    for (const o of this.mobs) { if (o === m || !pred(o)) continue; const d = Math.hypot(o.x - m.x, o.z - m.z, o.y - m.y); if (d < bd) { bd = d; best = o; } }
+    return best;
   }
   shootArrow(m, pl) {
     const sx = m.x, sy = m.y + 1.5, sz = m.z;

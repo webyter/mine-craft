@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import { Noise, hash3 } from './noise.js';
 import { B, BLOCKS } from './blocks.js';
 import { tileIndex } from './textures.js';
+import { Settlements } from './structures.js';
 
 export const CS = 16, H = 80, SEA = 28;
 const M = 8, R = CS + M * 2, RH = H + 2, RR = R * R;
@@ -10,7 +11,7 @@ const M = 8, R = CS + M * 2, RH = H + 2, RR = R * R;
 // property tables
 export const OPAQUE = new Uint8Array(256), FILTER = new Uint8Array(256), EMIT = new Uint8Array(256),
   SOLID = new Uint8Array(256), LIQUID = new Uint8Array(256), CUTOUT = new Uint8Array(256), CULLSAME = new Uint8Array(256), SHAPE = new Uint8Array(256);
-const SHAPES = { cube: 0, cross: 1, torch: 2, cactus: 3, slab: 4 };
+const SHAPES = { cube: 0, cross: 1, torch: 2, cactus: 3, slab: 4, post: 5 };
 export function initTables() {
   for (const b of BLOCKS) {
     if (!b) continue;
@@ -92,6 +93,8 @@ export class World {
     this.tiles = new Map(); // tile entity data
     this.rIds = new Uint8Array(RR * RH); this.rSky = new Uint8Array(RR * RH); this.rBlk = new Uint8Array(RR * RH);
     this.queue = new Int32Array(RR * RH * 2);
+    this.loot = new Map(); this.crops = new Map();
+    this.settle = new Settlements(this);
   }
   // ---------- terrain ----------
   column(x, z) {
@@ -148,6 +151,7 @@ export class World {
               else if (r < 0.0215 && y < 30) id = B.GOLD_ORE;
               else if (r < 0.027 && y < 16) id = B.REDSTONE_ORE;
               else if (r < 0.0293 && y < 14) id = B.DIAMOND_ORE;
+              else if (r < 0.033 && biome === 4 && y > 30) id = B.EMERALD_ORE;
             }
           }
         } else if (y <= SEA) id = (biome === 3 && y === SEA) ? B.ICE : B.WATER;
@@ -164,18 +168,26 @@ export class World {
         if (carve) bl[i] = y <= 7 ? B.LAVA : 0;
       }
     }
-    if (this.type === 'flat') return chunk;
     // features
     const setL = (x, y, z, id, force) => {
       x -= bx; z -= bz; if (x < 0 || z < 0 || x >= CS || z >= CS || y < 0 || y >= H) return;
       const i = lidx(x, y, z); const cur = bl[i];
       if (force ? cur !== B.BEDROCK : (cur === 0 || cur === B.TALL_GRASS)) bl[i] = id;
     };
+    const setM = (x, y, z, id, meta = 0) => {
+      x -= bx; z -= bz; if (x < 0 || z < 0 || x >= CS || z >= CS || y < 1 || y >= H) return;
+      const i = lidx(x, y, z); bl[i] = id; chunk.meta[i] = meta;
+    };
+    const getL = (x, y, z) => { x -= bx; z -= bz; if (x < 0 || z < 0 || x >= CS || z >= CS || y < 0 || y >= H) return -1; return bl[lidx(x, y, z)]; };
+    const rects = this.settle.applyChunk(bx, bz, setM, getL);
+    const settled = (wx, wz, m) => { for (const r of rects) if (wx >= r[0] - m && wx <= r[2] + m && wz >= r[1] - m && wz <= r[3] + m) return true; return false; };
+    if (this.type === 'flat') return chunk;
     for (let z = -3; z < CS + 3; z++) for (let x = -3; x < CS + 3; x++) {
       const wx = bx + x, wz = bz + z;
       const inside = x >= 0 && z >= 0 && x < CS && z < CS;
       const { h, biome } = inside ? { h: heights[z * CS + x], biome: biomes[z * CS + x] } : this.column(wx, wz);
       if (h <= SEA || h > H - 12) continue;
+      if (rects.length && settled(wx, wz, 3)) continue;
       const r = hash3(wx, 7, wz, seed);
       const dens = [0.006, 0.05, 0, 0.022, 0.006, 0, 0][biome];
       if (r < dens) {
@@ -362,10 +374,10 @@ export class World {
       for (let f = 0; f < 6; f++) {
         const F = FACES[f];
         const nri = ri + F.nOff; const nid = ids[nri];
-        if (OPAQUE[nid] && !(shape === 4 && f === 2) && !(shape === 3 && f !== 2 && f !== 3)) continue;
+        if (OPAQUE[nid] && !(shape === 4 && f === 2) && !((shape === 3 || shape === 5) && f !== 2 && f !== 3)) continue;
         if (nid === id && CULLSAME[id]) continue;
         if (liquid && (LIQUID[nid] || (f === 2 && false))) continue;
-        if (!liquid && LIQUID[id] === 0 && nid === id && shape !== 0) continue;
+        if (!liquid && LIQUID[id] === 0 && nid === id && shape !== 0 && !(shape === 5 && f !== 2 && f !== 3)) continue;
         let tile = F.side === 'top' ? b.tiles.top : F.side === 'bottom' ? b.tiles.bottom : b.tiles.side;
         if (m >= 0 && F.side === 'side' && FRONT_FACE[m] === f) tile = b.tiles.front;
         let ao0 = 0, ao2 = 0, ao1 = 0, ao3 = 0;
@@ -374,6 +386,7 @@ export class World {
           let px = cc[0], py = cc[1], pz = cc[2];
           if (py === 1) py = topH;
           if (shape === 3 && F.n[1] === 0) { if (F.n[0]) px = px ? 15 / 16 : 1 / 16; if (F.n[2]) pz = pz ? 15 / 16 : 1 / 16; }
+          else if (shape === 5) { px = px ? 10 / 16 : 6 / 16; pz = pz ? 10 / 16 : 6 / 16; }
           pos[v * 3] = x + px; pos[v * 3 + 1] = y + py; pos[v * 3 + 2] = z + pz;
           let [lu, lv] = F.uv[v]; if (F.side === 'side' && topH < 1 && cc[1] === 1) lv = topH;
           const uv = tileUV(tile, lu, lv); uvs[v * 2] = uv[0]; uvs[v * 2 + 1] = uv[1];

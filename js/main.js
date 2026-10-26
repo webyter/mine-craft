@@ -1,7 +1,7 @@
 // Mine Craft — main game
 import * as THREE from 'three';
 import { hashSeed, mulberry32 } from './noise.js';
-import { B, I, BLOCKS, ITEMS, isBlock, isTool, toolInfo, itemName, maxDur, maxStack, SMELT, FUEL, CREATIVE_LIST } from './blocks.js';
+import { B, I, BLOCKS, ITEMS, isBlock, isTool, toolInfo, toolId, itemName, maxDur, maxStack, SMELT, FUEL, CREATIVE_LIST } from './blocks.js';
 import { buildAtlas, tileIndex, iconFor } from './textures.js';
 import { World, initTables, CS, H, SEA, SOLID, LIQUID, OPAQUE, EMIT, ckey } from './world.js';
 import { EntityManager, moveEntity, collides, blockGeometry, MOBS } from './entities.js';
@@ -246,7 +246,8 @@ function loadedFraction(radius) {
 
 // ---------- block helpers ----------
 const REPLACEABLE = new Set([0, B.WATER, B.LAVA, B.TALL_GRASS, B.DEAD_BUSH]);
-const NEEDS_SUPPORT = new Set([B.TALL_GRASS, B.DANDELION, B.POPPY, B.DEAD_BUSH, B.TORCH, B.CACTUS]);
+const NEEDS_SUPPORT = new Set([B.TALL_GRASS, B.DANDELION, B.POPPY, B.DEAD_BUSH, B.TORCH, B.CACTUS, B.WHEAT_0, B.WHEAT_1, B.WHEAT_2, B.WHEAT_3]);
+const isWheat = (id) => id >= B.WHEAT_0 && id <= B.WHEAT_3;
 const tkey = (x, y, z) => x + ',' + y + ',' + z;
 game.setBlock = (x, y, z, id, meta = 0) => {
   const w = game.world; w.setBlock(x, y, z, id, meta);
@@ -267,7 +268,7 @@ game.setBlock = (x, y, z, id, meta = 0) => {
 };
 function popBlock(x, y, z, id) {
   game.setBlock(x, y, z, 0);
-  if (game.mode === 'survival') { const d = resolveDrop(id, null); if (d) ents.dropItem(d.id, d.n, x + 0.5, y + 0.3, z + 0.5); }
+  if (game.mode === 'survival') { const d = resolveDrop(id, null); if (d) { ents.dropItem(d.id, d.n, x + 0.5, y + 0.3, z + 0.5); if (d.extra) ents.dropItem(d.extra.id, d.extra.n, x + 0.5, y + 0.3, z + 0.5); } }
 }
 function resolveDrop(id, held) {
   const b = BLOCKS[id]; let drop = b.drop;
@@ -275,7 +276,8 @@ function resolveDrop(id, held) {
   if (b.tier > 0 && !(t && t.type === 'pickaxe' && t.tier >= b.tier)) return null;
   if (drop === 'gravel') return Math.random() < 0.1 ? { id: I.FLINT, n: 1 } : { id: B.GRAVEL, n: 1 };
   if (drop === 'leaves') return (id === B.OAK_LEAVES && Math.random() < 0.06) ? { id: I.APPLE, n: 1 } : Math.random() < 0.04 ? { id: I.STICK, n: 1 } : null;
-  if (drop === 'grass') return null;
+  if (drop === 'grass') return Math.random() < 0.125 ? { id: I.SEEDS, n: 1 } : null;
+  if (drop === 'wheat') return id === B.WHEAT_3 ? { id: I.WHEAT, n: 1, extra: { id: I.SEEDS, n: 1 + Math.floor(Math.random() * 3) } } : { id: I.SEEDS, n: 1 };
   if (!drop) return null;
   if (drop === I.REDSTONE) return { id: drop, n: 4 + Math.floor(Math.random() * 2) };
   return { id: drop, n: 1 };
@@ -295,7 +297,7 @@ function breakBlock(x, y, z) {
   const held = game.inv.held();
   if (game.mode === 'survival') {
     const d = resolveDrop(id, held);
-    if (d) ents.dropItem(d.id, d.n, x + 0.5, y + 0.4, z + 0.5);
+    if (d) { ents.dropItem(d.id, d.n, x + 0.5, y + 0.4, z + 0.5); if (d.extra) ents.dropItem(d.extra.id, d.extra.n, x + 0.5, y + 0.4, z + 0.5); }
     const xp = { [B.COAL_ORE]: 1, [B.DIAMOND_ORE]: 5, [B.REDSTONE_ORE]: 2 }[id]; if (xp && d) addXP(xp);
     if (held && maxDur(held.id) && BLOCKS[id].hardness > 0) { if (game.inv.damageHeld(toolInfo(held.id)?.type === 'sword' ? 2 : 1)) { sfx.brk(B.GLASS); toast('Your tool broke'); } }
     player.exh += 0.005;
@@ -367,7 +369,7 @@ game.explode = (x, y, z, power) => {
     player.hurtCd = 0; game.damagePlayer(dmg, x, z, 'explode');
     const d = pd || 1; player.vx += (player.x - x) / d * k * 14; player.vy += k * 9; player.vz += (player.z - z) / d * k * 14;
   }
-  for (const m of ents.mobs) { const md = Math.hypot(m.x - x, m.y - y, m.z - z); if (md < r * 2) { m.hurt = 0; ents.hurtMob(m, Math.round((1 - md / (r * 2)) * power * 5), x, z); } }
+  for (const m of ents.mobs) { const md = Math.hypot(m.x - x, m.y - y, m.z - z); if (md < r * 2) { m.hurt = 0; ents.hurtMob(m, Math.round((1 - md / (r * 2)) * power * 5), x, z, false); } }
 };
 
 // ---------- fluids ----------
@@ -397,9 +399,79 @@ function tickFluids(q, liquid, maxLevel) {
 // ---------- tiles (furnace/chest) ----------
 function getTile(x, y, z, type) {
   const k = tkey(x, y, z); let t = game.world.tiles.get(k);
-  if (!t) { t = type === 'chest' ? { type, slots: new Array(27).fill(null) } : { type, slots: [null, null, null], burn: 0, burnMax: 0, cook: 0, x, y, z }; game.world.tiles.set(k, t); }
+  if (!t) {
+    t = type === 'chest' ? { type, slots: new Array(27).fill(null) } : { type, slots: [null, null, null], burn: 0, burnMax: 0, cook: 0, x, y, z }; game.world.tiles.set(k, t);
+    const lt = game.world.loot.get(k); if (type === 'chest' && lt) { fillLoot(t.slots, lt); game.world.loot.delete(k); }
+  }
   return t;
 }
+const LOOT = {
+  house: [[I.BREAD, 1, 4, 0.8], [I.WHEAT, 1, 6, 0.6], [I.SEEDS, 1, 5, 0.5], [I.APPLE, 1, 3, 0.5], [I.EMERALD, 1, 2, 0.4], [B.TORCH, 2, 6, 0.4]],
+  smith: [[I.IRON_INGOT, 1, 5, 0.9], [I.BREAD, 1, 3, 0.6], [I.COAL, 2, 6, 0.6], [I.EMERALD, 1, 3, 0.5], [toolId(2, 0), 1, 1, 0.3], [toolId(2, 3), 1, 1, 0.25], [B.OBSIDIAN, 1, 3, 0.3], [I.DIAMOND, 1, 2, 0.12]],
+  library: [[I.EMERALD, 1, 3, 0.6], [B.BOOKSHELF, 1, 2, 0.4], [I.STICK, 2, 8, 0.5], [B.GLASS, 2, 5, 0.4], [B.TORCH, 2, 6, 0.5]],
+  butcher: [[I.RAW_PORK, 1, 4, 0.7], [I.RAW_BEEF, 1, 4, 0.6], [I.RAW_MUTTON, 1, 3, 0.5], [I.COAL, 1, 4, 0.6], [I.EMERALD, 1, 2, 0.3]],
+  city: [[I.EMERALD, 2, 6, 0.9], [I.IRON_INGOT, 2, 6, 0.7], [I.GOLD_INGOT, 1, 4, 0.5], [I.DIAMOND, 1, 3, 0.3], [B.GLOWSTONE, 1, 4, 0.5], [I.BREAD, 2, 5, 0.6], [I.STEAK, 1, 4, 0.5]],
+  shop: [[I.EMERALD, 1, 4, 0.8], [B.GLASS, 4, 12, 0.5], [B.BRICKS, 4, 12, 0.4], [B.TORCH, 4, 10, 0.5], [I.BREAD, 2, 5, 0.6], [I.COOKED_PORK, 1, 4, 0.5], [B.LAMP, 1, 3, 0.3]],
+};
+function fillLoot(slots, table) {
+  for (const [id, a, b, p] of LOOT[table] || LOOT.house) {
+    if (Math.random() > p) continue;
+    const n = a + Math.floor(Math.random() * (b - a + 1)); let i = Math.floor(Math.random() * 27), tries = 0;
+    while (slots[i] && tries++ < 30) i = Math.floor(Math.random() * 27);
+    slots[i] = { id, count: Math.min(n, maxStack(id)), dur: maxDur(id) };
+  }
+}
+// ---------- crops ----------
+let cropT = 0;
+function tickCrops(dt) {
+  cropT += dt; if (cropT < 1) return; cropT = 0;
+  const w = game.world;
+  for (const [k, [x, y, z]] of w.crops) {
+    if (!w.isLoaded(x, z)) continue;
+    const id = w.getBlock(x, y, z);
+    if (!isWheat(id) || id === B.WHEAT_3) { w.crops.delete(k); continue; }
+    if (Math.random() < 1 / 30) w.setBlock(x, y, z, id + 1);
+  }
+}
+// ---------- settlements: villagers ----------
+let settleT = 0;
+function tickSettlements(dt) {
+  settleT -= dt; if (settleT > 0) return; settleT = 1.5;
+  const w = game.world; const px = player.x, pz = player.z;
+  for (const p of w.settle.plansNear(px - 90, pz - 90, px + 90, pz + 90)) {
+    const d = Math.hypot(p.x - px, p.z - pz);
+    if (!p.pending && !p.spawned && d < 90) { p.pending = p.mobs.slice(); p.spawned = true; }
+    if (p.pending && p.pending.length) {
+      p.pending = p.pending.filter((e) => {
+        if (!w.isLoaded(Math.floor(e.x), Math.floor(e.z))) return true;
+        let y = e.y; while (y < H - 2 && (SOLID[w.getBlock(Math.floor(e.x), Math.floor(y), Math.floor(e.z))] || SOLID[w.getBlock(Math.floor(e.x), Math.floor(y) + 1, Math.floor(e.z))])) y++;
+        const m = ents.spawnMob(e.type, e.x, y + 0.01, e.z, { prof: e.prof, home: { x: e.x, z: e.z }, plan: p });
+        if (m.def.villager) m.trades = makeTrades(m.prof);
+        return false;
+      });
+    }
+  }
+  // reset settlements the player has left so they repopulate on return
+  for (const [, p] of w.settle.plans) {
+    if (!p || !p.spawned) continue;
+    if (Math.hypot(p.x - px, p.z - pz) > 160 && !ents.mobs.some((m) => m.plan === p)) { p.spawned = false; p.pending = null; }
+  }
+  // announce arrival
+  const here = w.settle.at(Math.floor(px), Math.floor(pz));
+  if (here !== game.lastSettlement) { game.lastSettlement = here; if (here) toast((here.type === 'city' ? '' : 'Village of ') + here.name, 2400); }
+}
+const TRADES = {
+  farmer: [[[I.WHEAT, 20], [I.EMERALD, 1]], [[B.PUMPKIN, 6], [I.EMERALD, 1]], [[I.EMERALD, 1], [I.BREAD, 6]], [[I.EMERALD, 1], [I.APPLE, 4]], [[I.EMERALD, 1], [I.SEEDS, 12]]],
+  librarian: [[[I.STICK, 32], [I.EMERALD, 1]], [[I.EMERALD, 1], [B.GLASS, 6]], [[I.EMERALD, 1], [B.TORCH, 12]], [[I.EMERALD, 4], [B.BOOKSHELF, 1]], [[I.EMERALD, 3], [B.LAMP, 2]]],
+  smith: [[[I.COAL, 15], [I.EMERALD, 1]], [[I.IRON_INGOT, 4], [I.EMERALD, 1]], [[I.EMERALD, 3], [toolId(2, 0), 1]], [[I.EMERALD, 4], [toolId(2, 3), 1]], [[I.EMERALD, 14], [toolId(4, 0), 1]], [[I.DIAMOND, 1], [I.EMERALD, 3]]],
+  cleric: [[[I.ROTTEN_FLESH, 24], [I.EMERALD, 1]], [[I.BONE, 12], [I.EMERALD, 1]], [[I.EMERALD, 1], [I.REDSTONE, 4]], [[I.EMERALD, 2], [B.GLOWSTONE, 1]], [[I.GOLD_INGOT, 3], [I.EMERALD, 1]]],
+  butcher: [[[I.RAW_PORK, 10], [I.EMERALD, 1]], [[I.RAW_BEEF, 10], [I.EMERALD, 1]], [[I.EMERALD, 1], [I.STEAK, 5]], [[I.EMERALD, 1], [I.COOKED_PORK, 5]], [[I.COAL, 15], [I.EMERALD, 1]]],
+  shepherd: [[[B.WOOL, 16], [I.EMERALD, 1]], [[I.EMERALD, 1], [B.RED_WOOL, 4]], [[I.EMERALD, 1], [B.BLUE_WOOL, 4]], [[I.EMERALD, 2], [B.BED, 1]], [[I.EMERALD, 1], [B.WOOL, 8]]],
+  mason: [[[B.CLAY, 10], [I.EMERALD, 1]], [[B.STONE, 20], [I.EMERALD, 1]], [[I.EMERALD, 1], [B.BRICKS, 10]], [[I.EMERALD, 1], [B.WHITE_CONCRETE, 12]], [[I.EMERALD, 1], [B.WINDOW, 8]], [[I.EMERALD, 2], [B.TERRACOTTA, 12]]],
+  nitwit: [],
+};
+function makeTrades(prof) { return (TRADES[prof] || []).map(([cost, out]) => ({ cost, out, uses: 0, max: 8 + Math.floor(Math.random() * 5) })); }
+game.makeTrades = makeTrades;
 let furnaceUiT = 0;
 function tickFurnaces(dt) {
   for (const [, t] of game.world.tiles) {
@@ -431,7 +503,7 @@ function maybeSpawnAnimals(c) {
   for (let i = 0; i < n; i++) {
     const x = c.cx * CS + Math.floor(r() * 16), z = c.cz * CS + Math.floor(r() * 16);
     const y = w.topSolid(x, z); if (w.getBlock(x, y, z) !== B.GRASS) continue;
-    if (ents.mobs.filter((m) => m.def.passive).length > 30) return;
+    if (ents.mobs.filter((m) => m.def.passive && !m.def.villager).length > 30) return;
     ents.spawnMob(type, x + 0.5, y + 1, z + 0.5);
   }
 }
@@ -461,7 +533,7 @@ function tickSpawning(dt) {
       ents.spawnMob(type, x + 0.5, y, z + 0.5); break;
     }
   }
-  const passive = ents.mobs.filter((m) => m.def.passive).length;
+  const passive = ents.mobs.filter((m) => m.def.passive && !m.def.villager).length;
   if (passive < 10 && game.daylight > 0.6 && Math.random() < 0.08 && game.world.type !== 'flat') {
     const ang = Math.random() * Math.PI * 2, d = 26 + Math.random() * 20;
     const x = Math.floor(player.x + Math.cos(ang) * d), z = Math.floor(player.z + Math.sin(ang) * d);
@@ -588,7 +660,16 @@ function facingMeta() {
 function useAt(sx, sy) {
   if (player.dead) return;
   const p = pick(sx, sy); const held = game.inv.held(); const w = game.world;
-  if (p.mob) { attackMob(p.mob); return; }
+  if (p.mob) {
+    const m = p.mob;
+    if (m.def.villager && !player.sneaking) {
+      if (!m.trades) m.trades = makeTrades(m.prof);
+      m.lookP = 8; m.targetYaw = Math.atan2(player.x - m.x, player.z - m.z);
+      if (!m.trades.length) { sfx.villagerNo(); toast('This villager has nothing to trade'); return; }
+      sfx.villager(); ui.open('trade', { type: 'trade', mob: m }); return;
+    }
+    attackMob(m); return;
+  }
   // food
   if (held && ITEMS[held.id] && ITEMS[held.id].food && game.mode === 'survival' && player.food < 20) {
     player.food = Math.min(20, player.food + ITEMS[held.id].food); player.sat = Math.min(player.food, player.sat + ITEMS[held.id].food * 0.6);
@@ -603,6 +684,23 @@ function useAt(sx, sy) {
   if (!p.block) { swing(); return; }
   const b = p.block; const bid = b.id;
   const sneaking = player.sneaking;
+  const above = w.getBlock(b.x, b.y + 1, b.z);
+  if (bid === B.BELL) { sfx.bell(); swing(); for (const m of ents.mobs) if (m.def.villager && Math.hypot(m.x - b.x, m.z - b.z) < 32) m.panic = 3; toast('The bell rings'); return; }
+  if (held && held.id === I.HOE && (bid === B.GRASS || bid === B.DIRT || bid === B.PATH || bid === B.SNOW_GRASS) && (above === 0 || above === B.TALL_GRASS)) {
+    if (above) game.setBlock(b.x, b.y + 1, b.z, 0);
+    game.setBlock(b.x, b.y, b.z, B.FARMLAND); sfx.till(); swing(); if (game.mode === 'survival') game.inv.damageHeld(1); return;
+  }
+  if (held && isTool(held.id) && toolInfo(held.id).type === 'shovel' && bid === B.GRASS && above === 0) {
+    game.setBlock(b.x, b.y, b.z, B.PATH); sfx.till(); swing(); if (game.mode === 'survival') game.inv.damageHeld(1); return;
+  }
+  if (held && held.id === I.SEEDS && bid === B.FARMLAND && above === 0) {
+    game.setBlock(b.x, b.y + 1, b.z, B.WHEAT_0); w.crops.set(tkey(b.x, b.y + 1, b.z), [b.x, b.y + 1, b.z]); sfx.place(B.TALL_GRASS); swing();
+    if (game.mode === 'survival') game.inv.consumeHeld(1); return;
+  }
+  if (held && held.id === I.BONE && isWheat(bid) && bid !== B.WHEAT_3) {
+    w.setBlock(b.x, b.y, b.z, Math.min(B.WHEAT_3, bid + 1 + Math.floor(Math.random() * 2))); ents.burst(b.x + 0.5, b.y + 0.5, b.z + 0.5, [0.5, 1, 0.5], 10, 2, 0.08); swing();
+    if (game.mode === 'survival') game.inv.consumeHeld(1); return;
+  }
   if (!sneaking) {
     if (bid === B.TABLE) { ui.open('table'); return; }
     if (bid === B.FURNACE || bid === B.LIT_FURNACE) { ui.open('furnace', getTile(b.x, b.y, b.z, 'furnace')); return; }
@@ -625,7 +723,8 @@ function useAt(sx, sy) {
   const pb = BLOCKS[placeId];
   if (NEEDS_SUPPORT.has(placeId)) {
     const below = w.getBlock(tx, ty - 1, tz);
-    if (placeId === B.TORCH) { if (!SOLID[below]) return; }
+    if (placeId === B.TORCH || placeId === B.FENCE) { if (!SOLID[below]) return; }
+    else if (isWheat(placeId)) { if (below !== B.FARMLAND) return; }
     else if (placeId === B.CACTUS) { if (below !== B.SAND && below !== B.CACTUS) return; }
     else if (![B.GRASS, B.DIRT, B.SNOW_GRASS, B.SAND].includes(below)) return;
   }
@@ -670,7 +769,7 @@ function runCommand(v) {
   if (!v.startsWith('/')) { chatLog('<Steve> ' + v); return; }
   const [cmd, ...a] = v.slice(1).split(/\s+/);
   const c = cmd.toLowerCase();
-  if (c === 'help') chatLog('Commands: /gamemode s|c, /time set day|night|noon|midnight, /weather clear|rain, /give <item> [n], /tp x y z, /summon pig|cow|sheep|zombie|creeper|skeleton|tnt, /difficulty 0-3, /kill, /seed, /spawnpoint, /heal');
+  if (c === 'help') chatLog('Commands: /gamemode s|c, /time set day|night|noon|midnight, /weather clear|rain, /give <item> [n], /tp x y z, /summon pig|cow|sheep|villager|iron_golem|zombie|creeper|skeleton|tnt, /locate village|city, /difficulty 0-3, /kill, /seed, /spawnpoint, /heal');
   else if (c === 'gamemode' || c === 'gm') { const m = (a[0] || '').toLowerCase(); setMode(m.startsWith('c') || m === '1' ? 'creative' : 'survival'); chatLog('Game mode set to ' + game.mode); }
   else if (c === 'time') { const t = (a[1] || a[0] || '').toLowerCase(); const map = { day: 1000, noon: 6000, sunset: 12000, night: 13500, midnight: 18000, sunrise: 23000 }; const base = Math.floor(game.ticks / 24000) * 24000; const n = map[t] ?? parseInt(t, 10); if (!isNaN(n)) { game.ticks = base + n; chatLog('Set the time to ' + t); } }
   else if (c === 'weather') { game.raining = (a[0] || '') === 'rain' || (a[0] || '') === 'thunder'; game.rainT = 600; chatLog('Weather: ' + (game.raining ? 'rain' : 'clear')); }
@@ -682,6 +781,12 @@ function runCommand(v) {
   }
   else if (c === 'tp') { const [x, y, z] = a.map((s, i) => s.startsWith('~') ? [player.x, player.y, player.z][i] + (parseFloat(s.slice(1)) || 0) : parseFloat(s)); if ([x, y, z].every((q) => !isNaN(q))) { player.x = x; player.y = y; player.z = z; player.vy = 0; chatLog(`Teleported to ${x.toFixed(1)}, ${y.toFixed(1)}, ${z.toFixed(1)}`); } }
   else if (c === 'summon') { const t = (a[0] || '').toLowerCase(); if (t === 'tnt') { ents.primeTNT(Math.floor(player.x - Math.sin(player.yaw) * 3), Math.floor(player.y), Math.floor(player.z - Math.cos(player.yaw) * 3)); chatLog('Summoned TNT'); } else if (MOBS[t]) { const fx = -Math.sin(player.yaw) * 3, fz = -Math.cos(player.yaw) * 3; ents.spawnMob(t, player.x + fx, player.y + 0.5, player.z + fz); chatLog('Summoned ' + t); } else chatLog('Unknown mob'); }
+  else if (c === 'locate') {
+    const t = (a[0] || 'village').toLowerCase().replace(/^minecraft:/, ''); const type = t.startsWith('c') ? 'city' : 'village';
+    const p = game.world.settle.nearest(type, player.x, player.z, 14);
+    if (!p) chatLog('Could not find a ' + type + ' nearby');
+    else { const d = Math.round(Math.hypot(p.x - player.x, p.z - player.z)); chatLog(`${type === 'city' ? p.name : 'Village of ' + p.name} is at ${p.x}, ${p.y + 2}, ${p.z} (${d} blocks away). Try /tp ${p.x} ${p.y + 2} ${p.z}`); }
+  }
   else if (c === 'difficulty') { const d = parseInt(a[0], 10); if (d >= 0 && d <= 3) { game.difficulty = d; chatLog('Difficulty ' + ['Peaceful', 'Easy', 'Normal', 'Hard'][d]); } }
   else if (c === 'kill') { if (game.mode === 'survival') { player.hurtCd = 0; game.damagePlayer(999, undefined, undefined, 'void'); } }
   else if (c === 'seed') chatLog('Seed: ' + game.seedText);
@@ -1002,6 +1107,8 @@ function update(dt) {
   fluidT += dt; if (fluidT > 0.25) { fluidT = 0; tickFluids(game.fluidQ, B.WATER, 7); }
   lavaT += dt; if (lavaT > 0.9) { lavaT = 0; tickFluids(game.lavaQ, B.LAVA, 3); }
   tickFurnaces(dt);
+  tickCrops(dt);
+  tickSettlements(dt);
   game.rainT -= dt; if (game.rainT < 0) { game.raining = !game.raining; game.rainT = game.raining ? 300 + Math.random() * 400 : 900 + Math.random() * 1500; }
   ui.renderStats(player, game.mode);
   coordsT -= dt; if (coordsT < 0) { coordsT = 0.25; $('coords').textContent = `XYZ: ${Math.floor(player.x)} / ${Math.floor(player.y)} / ${Math.floor(player.z)}`; }

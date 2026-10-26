@@ -33,7 +33,8 @@ function tone(freq, dur, vol, type = 'sine', slide = 0, out = sfxGain, when = 0)
 const MAT = (id) => {
   if ([1, 2, 18, 42, 32, 33, 34, 55].includes(id)) return 'grass';
   if ([6, 7, 47].includes(id)) return 'sand';
-  if ([8, 10, 21, 23, 25, 27, 41, 46, 56, 37].includes(id)) return 'wood';
+  if ([8, 10, 21, 23, 25, 27, 41, 46, 56, 37, 64, 72].includes(id)) return 'wood';
+  if ([58, 59, 60, 61, 62, 63].includes(id)) return 'grass';
   if ([9, 22, 24].includes(id)) return 'leaf';
   if ([12, 19, 38].includes(id)) return 'glass';
   if ([35, 49, 50, 51, 52, 53].includes(id)) return 'cloth';
@@ -60,6 +61,12 @@ export const sfx = {
   zombie() { tone(110, 0.7, 0.25, 'sawtooth', 0.7); noise(0.6, 300, 1, 0.15); },
   hiss() { noise(1.4, 4500, 0.4, 0.4, 'highpass', 0.2); },
   levelup() { tone(523, 0.15, 0.2, 'triangle'); tone(659, 0.15, 0.2, 'triangle', 0, sfxGain, 0.1); tone(784, 0.3, 0.2, 'triangle', 0, sfxGain, 0.2); },
+  villager() { const b = 260 + Math.random() * 60; tone(b, 0.12, 0.2, 'sawtooth', 1.3); tone(b * 1.2, 0.16, 0.18, 'sawtooth', 0.7, sfxGain, 0.12); },
+  villagerNo() { tone(240, 0.12, 0.2, 'sawtooth', 0.8); tone(200, 0.2, 0.18, 'sawtooth', 0.7, sfxGain, 0.13); },
+  golem() { tone(70, 0.5, 0.35, 'square', 0.6); noise(0.3, 200, 1, 0.3); },
+  bell() { for (const [f, v] of [[880, 0.25], [1320, 0.12], [2210, 0.06]]) tone(f, 2.2, v, 'sine', 0.995); },
+  trade() { tone(784, 0.1, 0.15, 'triangle'); tone(1047, 0.18, 0.15, 'triangle', 0, sfxGain, 0.08); },
+  till() { noise(0.15, 500, 1, 0.6); },
   craft() { noise(0.1, 500, 2, 0.4); tone(660, 0.1, 0.1, 'triangle', 1, sfxGain, 0.05); },
 };
 

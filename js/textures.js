@@ -198,6 +198,27 @@ export function buildAtlas() {
   newTile('pumpkin_top', (P) => { pumpkin(P); for (let y = 6; y < 10; y++) for (let x = 6; x < 10; x++) P.set(x, y, [90, 70, 30]); });
   const face = (lit) => (P) => { pumpkin(P); const c = lit ? [255, 230, 90] : [50, 30, 10]; for (const [x, y] of [[3, 4], [4, 4], [4, 5], [3, 5], [11, 4], [12, 4], [11, 5], [12, 5], [7, 7], [8, 7]]) P.set(x, y, c); for (let x = 3; x < 13; x++) { P.set(x, 10, c); if (x % 3) P.set(x, 11, c); } };
   newTile('pumpkin_face', face(false)); newTile('jack_face', face(true));
+  // ---- village / city tiles ----
+  newTile('path_top', (P) => { P.noise([148, 122, 66], 0.16); for (let k = 0; k < 20; k++) P.set(Math.floor(P.rnd() * 16), Math.floor(P.rnd() * 16), vary([120, 96, 52], 0.1, P.rnd)); });
+  newTile('path_side', (P) => { dirt(P); for (let x = 0; x < 16; x++) { P.set(x, 0, [0, 0, 0], 0); const h = 2 + Math.floor(P.rnd() * 2); for (let y = 1; y < h; y++) P.set(x, y, vary([148, 122, 66], 0.12, P.rnd)); } });
+  newTile('farmland', (P) => { for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) P.set(x, y, vary(y % 4 === 0 ? [70, 44, 26] : [100, 66, 40], 0.18, P.rnd)); });
+  for (let s = 0; s < 4; s++) newTile('wheat_' + s, (P) => plant(P, () => {
+    const h = 4 + s * 3; const col = s === 3 ? [200, 170, 60] : s === 2 ? [140, 160, 50] : [70, 150, 40];
+    for (let x = 1; x < 16; x += 3) { for (let y = 0; y < h; y++) P.set(x + (y > h - 3 ? 1 : 0), 15 - y, vary(col, 0.15, P.rnd)); if (s === 3) { P.set(x, 15 - h, [150, 110, 30]); P.set(x + 1, 16 - h, [150, 110, 30]); } }
+  }, s + 40));
+  newTile('hay_side', (P) => { for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) { let c = vary([196, 162, 40], 0.16, P.rnd); if (y === 3 || y === 12) c = [130, 60, 20]; P.set(x, y, c); } });
+  newTile('hay_top', (P) => { for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) P.set(x, y, vary((x + y) % 3 ? [190, 156, 40] : [160, 126, 30], 0.12, P.rnd)); });
+  newTile('bell', (P) => { metal(P, [240, 200, 60]); for (let x = 0; x < 16; x++) { P.set(x, 12, [180, 130, 30]); P.set(x, 13, [255, 230, 120]); } });
+  newTile('bell_top', (P) => metal(P, [220, 180, 50]));
+  const concrete = (c) => (P) => P.noise(c, 0.04);
+  newTile('concrete_white', concrete([207, 213, 214])); newTile('concrete_gray', concrete([96, 100, 104])); newTile('concrete_yellow', concrete([240, 175, 22]));
+  newTile('asphalt', (P) => { P.noise([46, 46, 50], 0.22); for (let k = 0; k < 18; k++) P.set(Math.floor(P.rnd() * 16), Math.floor(P.rnd() * 16), [72, 72, 76]); });
+  newTile('smooth_stone', (P) => { P.noise([160, 160, 160], 0.05); for (let i = 0; i < 16; i++) { P.set(i, 0, [120, 120, 120]); P.set(i, 15, [120, 120, 120]); P.set(0, i, [130, 130, 130]); P.set(15, i, [130, 130, 130]); } });
+  newTile('lamp', (P) => { for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) { const e = x === 0 || y === 0 || x === 15 || y === 15; P.set(x, y, e ? [90, 60, 30] : vary((x % 5 === 2 || y % 5 === 2) ? [255, 236, 170] : [240, 190, 90], 0.08, P.rnd)); } });
+  newTile('emerald_ore', (P) => ore(P, [60, 220, 110], [20, 150, 60], 3));
+  newTile('emerald_block', (P) => metal(P, [60, 200, 100]));
+  newTile('terracotta', (P) => P.noise([162, 84, 38], 0.06));
+  newTile('window', (P) => { for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) { const e = x === 0 || y === 0 || x === 15 || y === 15; const r = (x - y + 16) % 16; P.set(x, y, e ? [70, 74, 80] : (r === 3 || r === 4 || r === 10) ? [170, 210, 235] : vary([60, 110, 160], 0.05, P.rnd)); } });
   for (let s = 0; s < 10; s++) newTile('destroy_' + s, (P) => {
     P.clear(); const n = 2 + s * 2;
     for (let k = 0; k < n; k++) { let x = 7 + Math.floor((P.rnd() - 0.5) * (4 + s)), y = 7 + Math.floor((P.rnd() - 0.5) * (4 + s)); const len = 3 + s; for (let i = 0; i < len; i++) { P.set(x, y, [20, 20, 20], 200); x += P.rnd() < 0.5 ? 1 : -1; if (P.rnd() < 0.6) y += P.rnd() < 0.5 ? 1 : -1; } }
@@ -233,6 +254,7 @@ function blockIcon(id) {
   const b = BLOCKS[id]; const S = 48;
   const c = document.createElement('canvas'); c.width = c.height = S; const g = c.getContext('2d'); g.imageSmoothingEnabled = false;
   const t = b.tiles;
+  if (b.shape === 'post') { const tc = tileCanvas(nameOfTile(t.side)); for (const x0 of [8, 30]) g.drawImage(tc, 6, 0, 4, 16, x0, 4, 10, 42); for (const y0 of [12, 26]) g.drawImage(tc, 0, 6, 16, 3, 4, y0, 40, 6); return c.toDataURL(); }
   if (b.shape === 'cross' || b.shape === 'torch') { g.drawImage(tileCanvas(nameOfTile(t.side)), 0, 0, S, S); return c.toDataURL(); }
   const top = tileCanvas(nameOfTile(t.top)), left = tileCanvas(nameOfTile(t.front), 0.78), right = tileCanvas(nameOfTile(t.side), 0.6);
   const k = S / 16, pad = 2, s = (S - pad * 2);
@@ -284,6 +306,7 @@ function blob(g, colA, colB, seed, shape = 'round') {
 }
 function itemIcon(id) {
   const c = document.createElement('canvas'); c.width = c.height = 18; const g = c.getContext('2d');
+  if (id === I.HOE) { drawMap(g, ['................', '.....hhhhh......', '.....hh..s......', '.........s......', '........s.......', '.......s........', '......s.........', '.....s..........', '....s...........', '...s............'], { h: '#8a8a8a', s: '#6b4a24' }); return c.toDataURL(); }
   if (isTool(id)) {
     const t = toolInfo(id);
     drawMap(g, TOOL_SHAPES[t.type], { h: t.color, s: '#6b4a24', g: t.dark });
@@ -296,6 +319,7 @@ function itemIcon(id) {
       [I.ROTTEN_FLESH]: ['#8a6a3a', '#5a7a2a', 'meat'], [I.FLINT]: ['#3a3a3a', '#666', 'shard'], [I.FLINT_STEEL]: ['#c0c0c0', '#3a3a3a', 'shard'],
       [I.RAW_MUTTON]: ['#d04848', '#f0c0c0', 'meat'], [I.COOKED_MUTTON]: ['#9a5a30', '#6a3a18', 'meat'], [I.BREAD]: ['#c8923a', '#a0702a', 'loaf'],
       [I.BONE]: ['#eeeede', '#cfcfbf', 'bone'], [I.BUCKET]: ['#c8c8c8', '#9a9a9a', 'bucket'], [I.WATER_BUCKET]: ['#c8c8c8', '#9a9a9a', 'bucket'], [I.LAVA_BUCKET]: ['#c8c8c8', '#9a9a9a', 'bucket'], [I.ARROW]: ['#8a6232', '#ddd', 'stick'],
+      [I.SEEDS]: ['#5aa02a', '#3a7a1a', 'pile'], [I.WHEAT]: ['#d8b848', '#a88a28', 'stick'], [I.EMERALD]: ['#3ade6a', '#18a040', 'gem'],
     }[id] || ['#f0f', '#000', 'round'];
     blob(g, M[0], M[1], id * 13, M[2]);
     if (id === I.WATER_BUCKET || id === I.LAVA_BUCKET || id === I.BUCKET) { g.fillStyle = id === I.WATER_BUCKET ? '#3a6ae8' : id === I.LAVA_BUCKET ? '#ff7a10' : '#555'; g.fillRect(3, 5, 12, 2); }

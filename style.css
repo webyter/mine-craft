@@ -214,3 +214,12 @@ body:has(#pause:not(.hidden)) #hud, body:has(#settings:not(.hidden)) #hud, body:
 @media (orientation: portrait) {
   #right-btns, #joy { bottom: calc(110px + var(--safe-b)); }
 }
+
+/* Villager trading */
+.trade-list { display: flex; flex-direction: column; gap: 4px; max-height: calc(100dvh - 130px); overflow-y: auto; touch-action: pan-y; padding-right: 2px; }
+.trade-row { display: flex; align-items: center; gap: 8px; background: #b5b5b5; border: 2px solid; border-color: #fff #555 #555 #fff; padding: 3px 6px; }
+.trade-row .slot { --slot-size: min(40px, var(--slot-size)); width: var(--slot-size); height: var(--slot-size); flex: none; }
+.trade-row .arrow { font-size: 20px; }
+.trade-name { flex: 1; min-width: 70px; font-size: 14px; color: var(--ui-text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.trade-btn { min-height: 36px; min-width: 76px; padding: 4px 10px; font-size: 15px; }
+.trade-btn:disabled { opacity: 0.5; }

@@ -24,6 +24,11 @@ export class Inventory {
     this.onChange && this.onChange(); return false;
   }
   clear() { this.slots.fill(null); this.onChange && this.onChange(); }
+  count(id) { let n = 0; for (const s of this.slots) if (s && s.id === id) n += s.count; return n; }
+  remove(id, n) {
+    for (let i = 35; i >= 0 && n > 0; i--) { const s = this.slots[i]; if (s && s.id === id) { const k = Math.min(n, s.count); s.count -= k; n -= k; if (s.count <= 0) this.slots[i] = null; } }
+    this.onChange && this.onChange(); return n <= 0;
+  }
 }
 
 // ---------- pixel icons for hearts etc ----------
@@ -127,7 +132,8 @@ export class UI {
     else if (kind === 'table') this.craft = { n: 3, grid: new Array(9).fill(null) };
     else this.craft = null;
     this.$('inv').classList.remove('hidden');
-    this.$('inv-title').textContent = { inv: 'Inventory', table: 'Crafting', furnace: 'Furnace', chest: 'Chest', creative: 'Creative Inventory' }[kind];
+    this.$('inv-title').textContent = { inv: 'Inventory', table: 'Crafting', furnace: 'Furnace', chest: 'Chest', creative: 'Creative Inventory', trade: 'Villager' }[kind];
+    if (kind === 'trade' && tile && tile.mob) this.$('inv-title').textContent = (tile.mob.prof || 'villager').replace(/^./, (c) => c.toUpperCase()) + ' — Trades';
     this.game.onScreenOpen();
     this.renderScreen();
   }
@@ -252,6 +258,29 @@ export class UI {
       top.appendChild(col);
       const pr = document.createElement('div'); pr.className = 'progress'; pr.style.setProperty('--p', (t.cook / 8 * 100) + '%'); top.appendChild(pr);
       top.appendChild(this.makeSlot(t.slots, 2, { cls: 'out' }));
+    } else if (this.tile && this.tile.type === 'trade') {
+      const m = this.tile.mob; const inv = this.inv;
+      left.appendChild(label('Emeralds: ' + inv.count(127)));
+      const list = document.createElement('div'); list.className = 'trade-list';
+      m.trades.forEach((t, ti) => {
+        const row = document.createElement('div'); row.className = 'trade-row';
+        const can = inv.count(t.cost[0]) >= t.cost[1] && t.uses < t.max;
+        const mk = (id, n) => { const e = document.createElement('span'); e.className = 'slot'; e.innerHTML = this.slotHTML({ id, count: n }); e.title = itemName(id); return e; };
+        row.appendChild(mk(t.cost[0], t.cost[1]));
+        const ar = document.createElement('span'); ar.className = 'arrow'; ar.textContent = '➜'; row.appendChild(ar);
+        row.appendChild(mk(t.out[0], t.out[1]));
+        const nm = document.createElement('span'); nm.className = 'trade-name'; nm.textContent = itemName(t.out[0]); row.appendChild(nm);
+        const btn = document.createElement('button'); btn.className = 'btn trade-btn'; btn.textContent = t.uses >= t.max ? 'Sold out' : 'Trade'; btn.disabled = !can;
+        btn.addEventListener('click', () => {
+          const tt = m.trades[ti]; if (inv.count(tt.cost[0]) < tt.cost[1] || tt.uses >= tt.max) { sfx.villagerNo && sfx.villagerNo(); return; }
+          inv.remove(tt.cost[0], tt.cost[1]); const left = inv.add(tt.out[0], tt.out[1]); if (left) this.game.dropFromPlayer(tt.out[0], left);
+          tt.uses++; sfx.trade && sfx.trade(); if (Math.random() < 0.5) sfx.villager && sfx.villager(); m.lookP = 8;
+          this.game.addXP && this.game.addXP(3);
+          this.renderScreen(); this.renderHotbar();
+        });
+        row.appendChild(btn); list.appendChild(row);
+      });
+      left.appendChild(list); body.appendChild(left);
     } else if (this.tile && this.tile.type === 'chest') {
       left.appendChild(label('Chest'));
       top.appendChild(grid(this.tile.slots, 0, 27, 9));

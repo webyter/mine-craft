@@ -7,12 +7,15 @@ export const B = {
   DANDELION: 33, POPPY: 34, WOOL: 35, TNT: 36, BED: 37, GLOWSTONE: 38, LAVA: 39, OBSIDIAN: 40, BOOKSHELF: 41,
   CLAY: 42, IRON_BLOCK: 43, GOLD_BLOCK: 44, DIAMOND_BLOCK: 45, PUMPKIN: 46, SNOW_BLOCK: 47, MOSSY: 48,
   RED_WOOL: 49, BLUE_WOOL: 50, GREEN_WOOL: 51, YELLOW_WOOL: 52, BLACK_WOOL: 53, LIT_FURNACE: 54, DEAD_BUSH: 55,
-  JACK_O: 56, COAL_BLOCK: 57,
+  JACK_O: 56, COAL_BLOCK: 57, PATH: 58, FARMLAND: 59, WHEAT_0: 60, WHEAT_1: 61, WHEAT_2: 62, WHEAT_3: 63, HAY: 64,
+  BELL: 65, WHITE_CONCRETE: 66, GRAY_CONCRETE: 67, ASPHALT: 68, YELLOW_CONCRETE: 69, SMOOTH_STONE: 70, LAMP: 71,
+  FENCE: 72, EMERALD_ORE: 73, EMERALD_BLOCK: 74, TERRACOTTA: 75, WINDOW: 76,
 };
 export const I = {
   STICK: 100, COAL: 101, IRON_INGOT: 102, GOLD_INGOT: 103, DIAMOND: 104, REDSTONE: 105, APPLE: 106,
   RAW_PORK: 107, COOKED_PORK: 108, RAW_BEEF: 109, STEAK: 110, GUNPOWDER: 111, ROTTEN_FLESH: 112, FLINT: 113,
   FLINT_STEEL: 114, RAW_MUTTON: 117, COOKED_MUTTON: 118, BREAD: 119, BONE: 120, ARROW: 121, BUCKET: 122, WATER_BUCKET: 123, LAVA_BUCKET: 124,
+  SEEDS: 125, WHEAT: 126, EMERALD: 127, HOE: 128,
 };
 // tools: 130 + mat*4 + type
 export const TOOL_MATS = ['wooden', 'stone', 'iron', 'golden', 'diamond'];
@@ -92,6 +95,22 @@ def(54, { name: 'Lit Furnace', tex: { top: 'furnace_top', bottom: 'furnace_top',
 def(55, { name: 'Dead Bush', tex: 'dead_bush', solid: false, opaque: false, filter: 0, shape: 'cross', hardness: 0, drop: I.STICK });
 def(56, { name: "Jack o'Lantern", tex: { top: 'pumpkin_top', bottom: 'pumpkin_top', side: 'pumpkin_side', front: 'jack_face' }, light: 15, hardness: 1, tool: 'axe' });
 def(57, { name: 'Block of Coal', tex: 'coal_block', hardness: 5, tool: 'pickaxe', tier: 1 });
+def(58, { name: 'Dirt Path', tex: { top: 'path_top', bottom: 'dirt', side: 'path_side' }, hardness: 0.6, tool: 'shovel', drop: 2 });
+def(59, { name: 'Farmland', tex: { top: 'farmland', bottom: 'dirt', side: 'dirt' }, hardness: 0.6, tool: 'shovel', drop: 2 });
+for (let s = 0; s < 4; s++) def(60 + s, { name: 'Wheat Crops', tex: 'wheat_' + s, solid: false, opaque: false, filter: 0, shape: 'cross', hardness: 0, drop: 'wheat', creative: s === 3 });
+def(64, { name: 'Hay Bale', tex: { top: 'hay_top', bottom: 'hay_top', side: 'hay_side' }, hardness: 0.5 });
+def(65, { name: 'Bell', tex: { top: 'bell_top', bottom: 'bell_top', side: 'bell' }, opaque: false, filter: 0, shape: 'cactus', hardness: 1, tool: 'pickaxe' });
+def(66, { name: 'White Concrete', tex: 'concrete_white', hardness: 1.8, tool: 'pickaxe', tier: 1 });
+def(67, { name: 'Gray Concrete', tex: 'concrete_gray', hardness: 1.8, tool: 'pickaxe', tier: 1 });
+def(68, { name: 'Asphalt', tex: 'asphalt', hardness: 1.8, tool: 'pickaxe', tier: 1 });
+def(69, { name: 'Yellow Concrete', tex: 'concrete_yellow', hardness: 1.8, tool: 'pickaxe', tier: 1 });
+def(70, { name: 'Smooth Stone', tex: 'smooth_stone', hardness: 2, tool: 'pickaxe', tier: 1 });
+def(71, { name: 'Lamp', tex: 'lamp', light: 15, hardness: 0.3 });
+def(72, { name: 'Oak Fence', tex: 'planks', opaque: false, filter: 0, shape: 'post', hardness: 2, tool: 'axe' });
+def(73, { name: 'Emerald Ore', tex: 'emerald_ore', hardness: 3, tool: 'pickaxe', tier: 3, drop: I.EMERALD });
+def(74, { name: 'Block of Emerald', tex: 'emerald_block', hardness: 5, tool: 'pickaxe', tier: 3 });
+def(75, { name: 'Terracotta', tex: 'terracotta', hardness: 1.25, tool: 'pickaxe', tier: 1 });
+def(76, { name: 'Tinted Window', tex: 'window', opaque: false, filter: 0, hardness: 0.3, cullSame: true, drop: 0 });
 
 export const ITEMS = {};
 const it = (id, name, o = {}) => (ITEMS[id] = Object.assign({ id, name, stack: 64 }, o));
@@ -103,6 +122,7 @@ it(I.GUNPOWDER, 'Gunpowder'); it(I.ROTTEN_FLESH, 'Rotten Flesh', { food: 4 }); i
 it(I.FLINT_STEEL, 'Flint and Steel', { stack: 1, dur: 64 });
 it(I.RAW_MUTTON, 'Raw Mutton', { food: 2 }); it(I.COOKED_MUTTON, 'Cooked Mutton', { food: 6 });
 it(I.BREAD, 'Bread', { food: 5 }); it(I.BONE, 'Bone'); it(I.ARROW, 'Arrow');
+it(I.SEEDS, 'Wheat Seeds'); it(I.WHEAT, 'Wheat'); it(I.EMERALD, 'Emerald'); it(I.HOE, 'Hoe', { stack: 1, dur: 250 });
 it(I.BUCKET, 'Bucket', { stack: 16 }); it(I.WATER_BUCKET, 'Water Bucket', { stack: 1 }); it(I.LAVA_BUCKET, 'Lava Bucket', { stack: 1 });
 for (let m = 0; m < 5; m++) for (let t = 0; t < 4; t++) {
   const n = TOOL_MATS[m][0].toUpperCase() + TOOL_MATS[m].slice(1) + ' ' + TOOL_TYPES[t][0].toUpperCase() + TOOL_TYPES[t].slice(1);
@@ -117,8 +137,8 @@ export const maxDur = (id) => ITEMS[id] && ITEMS[id].dur ? ITEMS[id].dur : 0;
 // Creative inventory ordering
 export const CREATIVE_LIST = [
   1, 2, 3, 4, 48, 5, 6, 7, 31, 42, 8, 21, 23, 10, 9, 22, 24, 12, 19, 47, 18, 20, 13, 14, 15, 16, 17, 57, 43, 44, 45,
-  40, 29, 30, 41, 35, 49, 50, 51, 52, 53, 25, 26, 27, 28, 38, 46, 56, 36, 37, 32, 33, 34, 55,
-  I.STICK, I.COAL, I.IRON_INGOT, I.GOLD_INGOT, I.DIAMOND, I.REDSTONE, I.FLINT, I.FLINT_STEEL, I.BUCKET, I.WATER_BUCKET, I.LAVA_BUCKET, I.GUNPOWDER, I.BONE,
+  74, 73, 40, 29, 30, 70, 66, 67, 68, 69, 75, 76, 58, 59, 64, 65, 71, 72, 63, 41, 35, 49, 50, 51, 52, 53, 25, 26, 27, 28, 38, 46, 56, 36, 37, 32, 33, 34, 55,
+  I.STICK, I.COAL, I.EMERALD, I.SEEDS, I.WHEAT, I.HOE, I.IRON_INGOT, I.GOLD_INGOT, I.DIAMOND, I.REDSTONE, I.FLINT, I.FLINT_STEEL, I.BUCKET, I.WATER_BUCKET, I.LAVA_BUCKET, I.GUNPOWDER, I.BONE,
   I.APPLE, I.BREAD, I.RAW_PORK, I.COOKED_PORK, I.RAW_BEEF, I.STEAK, I.RAW_MUTTON, I.COOKED_MUTTON, I.ROTTEN_FLESH,
   ...[0, 1, 2, 3, 4].flatMap((m) => [0, 1, 2, 3].map((t) => toolId(m, t))),
 ];
@@ -157,6 +177,16 @@ shapeless([35, 34], 49); shapeless([35, 33], 52); shapeless([35, I.COAL], 53);
 shapeless([46, 28], 56);
 shapeless([4, 9], 48);
 shaped(['GG', 'GG'], { G: 12 }, 38);
+shaped(['WWW'], { W: I.WHEAT }, I.BREAD);
+shaped(['WWW', 'WWW', 'WWW'], { W: I.WHEAT }, 64); shapeless([64], I.WHEAT, 9);
+shaped(['EEE', 'EEE', 'EEE'], { E: I.EMERALD }, 74); shapeless([74], I.EMERALD, 9);
+shaped(['MM', ' S', ' S'], { M: 10, S: I.STICK }, I.HOE);
+shaped(['MM', ' S', ' S'], { M: 4, S: I.STICK }, I.HOE);
+shaped(['PSP', 'PSP'], { P: 10, S: I.STICK }, 72, 3);
+shaped(['GGG', 'GCG', 'GGG'], { G: 12, C: I.COAL }, 76, 8);
+shaped(['SSS'], { S: 3 }, 70, 3);
+shaped(['GSG', 'SCS', 'GSG'], { G: 12, S: 6, C: I.COAL }, 71, 2);
+shapeless([6, 7, 35], 66, 8); shapeless([6, 7, I.COAL], 68, 8); shapeless([6, 7], 67, 8); shapeless([6, 7, 52], 69, 8);
 const MATS = [10, 4, I.IRON_INGOT, I.GOLD_INGOT, I.DIAMOND];
 for (let m = 0; m < 5; m++) {
   const k = { M: MATS[m], S: I.STICK };
@@ -203,9 +233,9 @@ export function matchRecipe(grid, n) {
 }
 
 export const SMELT = {
-  14: I.IRON_INGOT, 15: I.GOLD_INGOT, 6: 12, 4: 3, 42: 29, [I.RAW_PORK]: I.COOKED_PORK, [I.RAW_BEEF]: I.STEAK,
-  [I.RAW_MUTTON]: I.COOKED_MUTTON, 8: I.COAL, 21: I.COAL, 23: I.COAL, 20: 51, 13: I.COAL, 16: I.DIAMOND, 30: 3,
+  14: I.IRON_INGOT, 15: I.GOLD_INGOT, 6: 12, 4: 3, 73: I.EMERALD, 3: 70, [I.RAW_PORK]: I.COOKED_PORK, [I.RAW_BEEF]: I.STEAK,
+  [I.RAW_MUTTON]: I.COOKED_MUTTON, 42: 29, 8: I.COAL, 21: I.COAL, 23: I.COAL, 20: 51, 13: I.COAL, 16: I.DIAMOND, 30: 3,
 };
 // fuel: number of items smelted
-export const FUEL = { [I.COAL]: 8, 57: 80, 10: 1.5, 8: 1.5, 21: 1.5, 23: 1.5, [I.STICK]: 0.5, 25: 1.5, 27: 1.5, 41: 1.5 };
+export const FUEL = { [I.COAL]: 8, 64: 4, 72: 1.5, 57: 80, 10: 1.5, 8: 1.5, 21: 1.5, 23: 1.5, [I.STICK]: 0.5, 25: 1.5, 27: 1.5, 41: 1.5 };
 for (const t of [0, 1, 2, 3]) FUEL[toolId(0, t)] = 1;
