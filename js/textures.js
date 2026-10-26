@@ -219,6 +219,34 @@ export function buildAtlas() {
   newTile('emerald_block', (P) => metal(P, [60, 200, 100]));
   newTile('terracotta', (P) => P.noise([162, 84, 38], 0.06));
   newTile('window', (P) => { for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) { const e = x === 0 || y === 0 || x === 15 || y === 15; const r = (x - y + 16) % 16; P.set(x, y, e ? [70, 74, 80] : (r === 3 || r === 4 || r === 10) ? [170, 210, 235] : vary([60, 110, 160], 0.05, P.rnd)); } });
+  // ---- enchanting / nether tiles ----
+  const netherrack = (P) => { for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) { const r = P.rnd(); P.set(x, y, r < 0.18 ? [80, 22, 22] : r < 0.3 ? [140, 60, 56] : vary([110, 40, 38], 0.18, P.rnd)); } };
+  newTile('netherrack', netherrack);
+  const nOre = (c1, c2) => (P) => { netherrack(P); for (let k = 0; k < 5; k++) { const cx = 2 + Math.floor(P.rnd() * 12), cy = 2 + Math.floor(P.rnd() * 12); for (const [dx, dy] of [[0, 0], [1, 0], [0, 1], [-1, 0]]) if (P.rnd() < 0.8) P.set(cx + dx, cy + dy, P.rnd() < 0.5 ? c1 : c2); } };
+  newTile('quartz_ore', nOre([236, 230, 220], [200, 190, 180]));
+  newTile('nether_gold_ore', nOre([252, 220, 70], [210, 160, 30]));
+  newTile('soul_sand', (P) => { P.noise([84, 64, 50], 0.18); for (const [fx, fy] of [[3, 4], [10, 3], [6, 10], [12, 11]]) { P.set(fx, fy, [40, 28, 22]); P.set(fx + 2, fy, [40, 28, 22]); P.set(fx + 1, fy + 2, [44, 30, 24]); P.set(fx, fy + 2, [44, 30, 24]); P.set(fx + 2, fy + 2, [44, 30, 24]); } });
+  newTile('soul_soil', (P) => { P.noise([76, 58, 46], 0.22); for (let k = 0; k < 18; k++) P.set(Math.floor(P.rnd() * 16), Math.floor(P.rnd() * 16), [56, 42, 34]); });
+  newTile('nether_bricks', (P) => { for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) { const row = Math.floor(y / 4); const off = row % 2 ? 4 : 0; let c = vary([60, 28, 34], 0.15, P.rnd); if (y % 4 === 3 || (x + off) % 8 === 7) c = [28, 12, 16]; P.set(x, y, c); } });
+  newTile('portal', (P) => { for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) { const w = Math.sin(x * 0.9 + Math.sin(y * 0.7) * 2.2) * 0.5 + 0.5; P.set(x, y, [Math.round(110 + w * 80), Math.round(20 + w * 40), Math.round(200 + w * 55)], 200); } });
+  newTile('magma', (P) => { for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) { const crack = (Math.sin(x * 1.3 + y * 0.4) + Math.sin(y * 1.1 - x * 0.5)) > 1.1; P.set(x, y, crack ? vary([255, 150, 40], 0.12, P.rnd) : vary([110, 40, 24], 0.2, P.rnd)); } });
+  newTile('nylium_top', (P) => { P.noise([150, 28, 30], 0.2); for (let k = 0; k < 24; k++) P.set(Math.floor(P.rnd() * 16), Math.floor(P.rnd() * 16), [190, 50, 40]); });
+  newTile('nylium_side', (P) => { netherrack(P); for (let x = 0; x < 16; x++) { const h = 2 + Math.floor(P.rnd() * 3); for (let y = 0; y < h; y++) P.set(x, y, vary([150, 28, 30], 0.2, P.rnd)); } });
+  newTile('crimson_stem', (P) => log(P, [110, 36, 56], [70, 20, 36], (Q) => { for (let k = 0; k < 10; k++) Q.set(Math.floor(Q.rnd() * 16), Math.floor(Q.rnd() * 16), [30, 160, 150]); }));
+  newTile('crimson_stem_top', (P) => logTop(P, [110, 36, 56], [140, 60, 80], [120, 46, 66]));
+  newTile('wart_block', (P) => { P.noise([130, 16, 18], 0.25); for (let k = 0; k < 20; k++) P.set(Math.floor(P.rnd() * 16), Math.floor(P.rnd() * 16), [90, 8, 10]); });
+  newTile('shroomlight', (P) => voronoi(P, 8, (i) => i % 2 ? [255, 190, 90] : [240, 150, 60], 0.7, [200, 100, 40]));
+  newTile('basalt_side', (P) => { for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) P.set(x, y, vary(x % 5 === 0 ? [50, 50, 56] : [80, 80, 86], 0.12, P.rnd)); });
+  newTile('basalt_top', (P) => { for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) { const r = Math.max(Math.abs(x - 7.5), Math.abs(y - 7.5)); P.set(x, y, vary(Math.floor(r) % 3 === 0 ? [60, 60, 66] : [90, 90, 96], 0.1, P.rnd)); } });
+  newTile('spawner', (P) => { P.clear(); for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) if (x % 5 === 0 || y % 5 === 0 || x === 15 || y === 15) P.set(x, y, vary([40, 50, 60], 0.2, P.rnd)); });
+  newTile('quartz_side', (P) => { P.noise([236, 230, 222], 0.04); for (let i = 0; i < 16; i++) { P.set(i, 0, [210, 204, 196]); P.set(i, 15, [210, 204, 196]); } });
+  newTile('quartz_top', (P) => P.noise([238, 232, 226], 0.04));
+  newTile('sugar_cane', (P) => plant(P, () => { for (const x0 of [3, 8, 12]) for (let y = 0; y < 16; y++) { const c = y % 5 === 0 ? [120, 170, 80] : vary([150, 200, 100], 0.1, P.rnd); P.set(x0, y, c); P.set(x0 + 1, y, mul(c, 0.85)); } P.set(5, 6, [110, 160, 70]); P.set(6, 5, [110, 160, 70]); P.set(10, 10, [110, 160, 70]); }));
+  newTile('lapis_ore', (P) => ore(P, [40, 80, 200], [20, 50, 160], 5));
+  newTile('lapis_block', (P) => metal(P, [36, 70, 180]));
+  newTile('crimson_fungus', (P) => plant(P, () => { for (let y = 9; y < 16; y++) P.set(7, y, [230, 200, 160]); for (let x = 4; x < 12; x++) for (let y = 5; y < 9; y++) if (!(y === 5 && (x === 4 || x === 11))) P.set(x, y, vary([200, 30, 30], 0.12, P.rnd)); P.set(6, 6, [255, 200, 90]); P.set(9, 7, [255, 200, 90]); }));
+  newTile('ench_top', (P) => { for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) { const e = x < 2 || y < 2 || x > 13 || y > 13; P.set(x, y, e ? vary([30, 20, 40], 0.3, P.rnd) : vary([170, 30, 40], 0.1, P.rnd)); } for (let k = 0; k < 8; k++) P.set(3 + Math.floor(P.rnd() * 10), 3 + Math.floor(P.rnd() * 10), [60, 220, 220]); });
+  newTile('ench_side', (P) => { for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) { const r = P.rnd(); P.set(x, y, y < 4 ? vary([170, 30, 40], 0.1, P.rnd) : r < 0.1 ? [80, 50, 120] : vary([20, 16, 32], 0.4, P.rnd)); } for (let x = 0; x < 16; x++) P.set(x, 4, [230, 200, 120]); });
   for (let s = 0; s < 10; s++) newTile('destroy_' + s, (P) => {
     P.clear(); const n = 2 + s * 2;
     for (let k = 0; k < n; k++) { let x = 7 + Math.floor((P.rnd() - 0.5) * (4 + s)), y = 7 + Math.floor((P.rnd() - 0.5) * (4 + s)); const len = 3 + s; for (let i = 0; i < len; i++) { P.set(x, y, [20, 20, 20], 200); x += P.rnd() < 0.5 ? 1 : -1; if (P.rnd() < 0.6) y += P.rnd() < 0.5 ? 1 : -1; } }
@@ -297,6 +325,9 @@ function blob(g, colA, colB, seed, shape = 'round') {
       else if (shape === 'stick') inside = Math.abs(x - (13 - y)) < 1 && y > 1 && y < 13;
       else if (shape === 'bone') inside = Math.abs(x - (13 - y)) < 1.2 && y > 1 && y < 13 || ((x - 2) ** 2 + (y - 11) ** 2 < 3) || ((x - 11) ** 2 + (y - 2) ** 2 < 3);
       else if (shape === 'bucket') inside = y > 3 && y < 12 && Math.abs(dx) < 5.2 - (y - 3) * 0.25;
+      else if (shape === 'book') inside = x > 2 && x < 12 && y > 1 && y < 13;
+      else if (shape === 'paper') inside = x > 2 && x < 12 && y > 1 && y < 12 && !(x > 9 && y < 4);
+      else if (shape === 'nugget') inside = (dx * dx + dy * dy) < 9 + r() * 3;
       else if (shape === 'loaf') inside = (dx * dx) / 42 + (dy * dy) / 10 < 1;
       s += inside ? (r() < 0.3 ? 'b' : 'a') : '.';
     }
@@ -319,10 +350,15 @@ function itemIcon(id) {
       [I.ROTTEN_FLESH]: ['#8a6a3a', '#5a7a2a', 'meat'], [I.FLINT]: ['#3a3a3a', '#666', 'shard'], [I.FLINT_STEEL]: ['#c0c0c0', '#3a3a3a', 'shard'],
       [I.RAW_MUTTON]: ['#d04848', '#f0c0c0', 'meat'], [I.COOKED_MUTTON]: ['#9a5a30', '#6a3a18', 'meat'], [I.BREAD]: ['#c8923a', '#a0702a', 'loaf'],
       [I.BONE]: ['#eeeede', '#cfcfbf', 'bone'], [I.BUCKET]: ['#c8c8c8', '#9a9a9a', 'bucket'], [I.WATER_BUCKET]: ['#c8c8c8', '#9a9a9a', 'bucket'], [I.LAVA_BUCKET]: ['#c8c8c8', '#9a9a9a', 'bucket'], [I.ARROW]: ['#8a6232', '#ddd', 'stick'],
+      [I.LAPIS]: ['#2a50c8', '#4a78ff', 'gem'], [I.BOOK]: ['#8a3a2a', '#e8e0c8', 'book'], [I.PAPER]: ['#f0ece0', '#d8d2c0', 'paper'],
+      [I.LEATHER]: ['#a0602a', '#7a4418', 'paper'], [I.QUARTZ]: ['#f0ece6', '#c8c0b8', 'shard'], [I.GOLD_NUGGET]: ['#f8d848', '#c09020', 'nugget'],
+      [I.BLAZE_ROD]: ['#f8c830', '#ff8a10', 'stick'], [I.BLAZE_POWDER]: ['#ffb020', '#ff7010', 'pile'], [I.GHAST_TEAR]: ['#e8f4f8', '#a8d0e0', 'gem'],
+      [I.MAGMA_CREAM]: ['#e8701a', '#f8d040', 'round'], [I.NETHER_BRICK]: ['#5a2a30', '#3a1418', 'ingot'],
       [I.SEEDS]: ['#5aa02a', '#3a7a1a', 'pile'], [I.WHEAT]: ['#d8b848', '#a88a28', 'stick'], [I.EMERALD]: ['#3ade6a', '#18a040', 'gem'],
     }[id] || ['#f0f', '#000', 'round'];
     blob(g, M[0], M[1], id * 13, M[2]);
     if (id === I.WATER_BUCKET || id === I.LAVA_BUCKET || id === I.BUCKET) { g.fillStyle = id === I.WATER_BUCKET ? '#3a6ae8' : id === I.LAVA_BUCKET ? '#ff7a10' : '#555'; g.fillRect(3, 5, 12, 2); }
+    if (id === I.BOOK) { g.fillStyle = '#f0e8d0'; g.fillRect(11, 3, 2, 10); g.fillStyle = '#d8b040'; g.fillRect(6, 5, 3, 1); }
     if (id === I.APPLE) { g.fillStyle = '#5a3a1a'; g.fillRect(8, 1, 1, 3); g.fillStyle = '#3a9a2a'; g.fillRect(9, 2, 2, 1); }
   }
   return c.toDataURL();

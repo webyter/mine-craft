@@ -1,18 +1,18 @@
 // Inventory model + HUD + container screens
 import { iconFor } from './textures.js';
-import { itemName, maxStack, maxDur, matchRecipe, CREATIVE_LIST, isBlock, isTool, BLOCKS, ITEMS, SMELT, FUEL } from './blocks.js';
+import { itemName, maxStack, maxDur, matchRecipe, CREATIVE_LIST, isBlock, isTool, BLOCKS, ITEMS, SMELT, FUEL, I, enchText, enchKind, ENCH } from './blocks.js';
 import { sfx } from './audio.js';
 
 export class Inventory {
   constructor() { this.slots = new Array(36).fill(null); this.sel = 0; }
   held() { return this.slots[this.sel]; }
-  add(id, count = 1, dur) {
-    const ms = maxStack(id);
+  add(id, count = 1, dur, ench) {
+    const ms = ench ? 1 : maxStack(id);
     if (ms > 1) for (let i = 0; i < 36 && count > 0; i++) {
       const s = this.slots[i]; if (s && s.id === id && s.count < ms) { const n = Math.min(ms - s.count, count); s.count += n; count -= n; }
     }
     for (let i = 0; i < 36 && count > 0; i++) {
-      if (!this.slots[i]) { const n = Math.min(ms, count); this.slots[i] = { id, count: n, dur: dur ?? maxDur(id) }; count -= n; }
+      if (!this.slots[i]) { const n = Math.min(ms, count); this.slots[i] = { id, count: n, dur: dur ?? maxDur(id) }; if (ench) this.slots[i].ench = ench; count -= n; }
     }
     this.onChange && this.onChange();
     return count;
@@ -20,6 +20,7 @@ export class Inventory {
   consumeHeld(n = 1) { const s = this.held(); if (!s) return; s.count -= n; if (s.count <= 0) this.slots[this.sel] = null; this.onChange && this.onChange(); }
   damageHeld(n = 1) {
     const s = this.held(); if (!s || !maxDur(s.id)) return false;
+    const ub = (s.ench && s.ench.unbreaking) || 0; if (ub && Math.random() > 1 / (ub + 1)) return false;
     s.dur -= n; if (s.dur <= 0) { this.slots[this.sel] = null; this.onChange && this.onChange(); return true; }
     this.onChange && this.onChange(); return false;
   }
@@ -85,13 +86,14 @@ export class UI {
   select(i) {
     this.inv.sel = i; this.renderHotbar(); sfx.click();
     const h = this.inv.held(); const el = this.$('item-name');
-    if (h) { el.textContent = itemName(h.id); el.classList.add('show'); clearTimeout(this.nameTimer); this.nameTimer = setTimeout(() => el.classList.remove('show'), 1800); }
+    if (h) { el.textContent = itemName(h.id) + (h.ench ? ' (' + enchText(h.ench) + ')' : ''); el.classList.toggle('ench', !!h.ench); el.classList.add('show'); clearTimeout(this.nameTimer); this.nameTimer = setTimeout(() => el.classList.remove('show'), 1800); }
     else el.classList.remove('show');
     this.game.onHeldChange && this.game.onHeldChange();
   }
   slotHTML(s) {
     if (!s) return '';
     let h = `<img src="${iconFor(s.id)}" alt="">`;
+    if (s.ench) h += '<span class="glint"></span>';
     if (s.count > 1) h += `<span class="cnt">${s.count}</span>`;
     const md = maxDur(s.id);
     if (md && s.dur < md) { const p = s.dur / md; h += `<span class="dur"><i style="width:${p * 100}%;background:hsl(${p * 120},90%,50%)"></i></span>`; }
@@ -132,7 +134,7 @@ export class UI {
     else if (kind === 'table') this.craft = { n: 3, grid: new Array(9).fill(null) };
     else this.craft = null;
     this.$('inv').classList.remove('hidden');
-    this.$('inv-title').textContent = { inv: 'Inventory', table: 'Crafting', furnace: 'Furnace', chest: 'Chest', creative: 'Creative Inventory', trade: 'Villager' }[kind];
+    this.$('inv-title').textContent = { inv: 'Inventory', table: 'Crafting', furnace: 'Furnace', chest: 'Chest', enchant: 'Enchant', creative: 'Creative Inventory', trade: 'Villager' }[kind];
     if (kind === 'trade' && tile && tile.mob) this.$('inv-title').textContent = (tile.mob.prof || 'villager').replace(/^./, (c) => c.toUpperCase()) + ' — Trades';
     this.game.onScreenOpen();
     this.renderScreen();
@@ -140,13 +142,14 @@ export class UI {
   close() {
     if (!this.screen) return;
     if (this.craft) for (let i = 0; i < this.craft.grid.length; i++) { const s = this.craft.grid[i]; if (s) this.giveBack(s); }
+    if (this.tile && this.tile.type === 'enchant') for (let i = 0; i < 2; i++) { const s = this.tile.slots[i]; if (s) this.giveBack(s); this.tile.slots[i] = null; }
     if (this.cursor) { this.giveBack(this.cursor); this.cursor = null; }
     this.craft = null; this.screen = null; this.tile = null;
     this.$('inv').classList.add('hidden');
     this.game.onScreenClose();
     this.renderHotbar();
   }
-  giveBack(s) { const left = this.inv.add(s.id, s.count, s.dur); if (left > 0) this.game.dropFromPlayer(s.id, left, s.dur); }
+  giveBack(s) { const left = this.inv.add(s.id, s.count, s.dur, s.ench); if (left > 0) this.game.dropFromPlayer(s.id, left, s.dur, s.ench); }
   makeSlot(arr, i, opts = {}) {
     const el = document.createElement('button'); el.className = 'slot' + (opts.cls ? ' ' + opts.cls : '');
     el.innerHTML = this.slotHTML(arr ? arr[i] : opts.stack);
@@ -166,6 +169,8 @@ export class UI {
       else { this.cursor = s; arr[i] = null; }
     } else {
       if (this.tile && this.tile.type === 'furnace' && arr === this.tile.slots && i === 2) return; // output only
+      if (this.tile && this.tile.type === 'enchant' && arr === this.tile.slots && i === 1 && c.id !== I.LAPIS) return; // lapis only
+      if (this.tile && this.tile.type === 'enchant' && arr === this.tile.slots && i === 0 && !s && c.count > 1) { arr[0] = { ...c, count: 1 }; c.count--; sfx.click(); this.renderScreen(); this.renderHotbar(); return; }
       if (!s) {
         if (long) { arr[i] = { ...c, count: 1 }; c.count--; if (c.count <= 0) this.cursor = null; }
         else { arr[i] = c; this.cursor = null; }
@@ -281,6 +286,29 @@ export class UI {
         row.appendChild(btn); list.appendChild(row);
       });
       left.appendChild(list); body.appendChild(left);
+    } else if (this.tile && this.tile.type === 'enchant') {
+      const t = this.tile; const g = this.game;
+      left.appendChild(label('Bookshelves: ' + t.shelves + (g.mode === 'creative' ? ' · Creative' : ' · Level ' + g.player.level)));
+      const wrap = document.createElement('div'); wrap.className = 'ench-wrap';
+      const slotsCol = document.createElement('div'); slotsCol.className = 'ench-slots';
+      const s0 = this.makeSlot(t.slots, 0); s0.title = 'Item'; slotsCol.appendChild(s0);
+      const s1 = this.makeSlot(t.slots, 1, { cls: 'lapis-slot' }); s1.title = 'Lapis Lazuli'; slotsCol.appendChild(s1);
+      wrap.appendChild(slotsCol);
+      const opts = document.createElement('div'); opts.className = 'ench-opts';
+      const list = g.enchantOptions ? g.enchantOptions(t) : [];
+      const item = t.slots[0];
+      for (let k = 0; k < 3; k++) {
+        const o = list[k]; const b = document.createElement('button'); b.className = 'ench-opt';
+        if (!o) { b.disabled = true; b.innerHTML = '<span class="glyph">' + (item ? (item.ench ? 'Already enchanted' : enchKind(item.id) ? '' : 'Cannot be enchanted') : '') + '</span>'; opts.appendChild(b); continue; }
+        const lapis = t.slots[1] ? t.slots[1].count : 0;
+        const ok = g.mode === 'creative' || (g.player.level >= o.cost && lapis >= k + 1);
+        b.disabled = !ok;
+        const first = Object.keys(o.ench)[0];
+        b.innerHTML = `<span class="glyph">${ENCH[first].name}${ENCH[first].max > 1 ? ' ' + ['', 'I', 'II', 'III', 'IV', 'V'][o.ench[first]] : ''}${Object.keys(o.ench).length > 1 ? ' . . . ?' : ''}</span><span class="cost"><b>${o.cost}</b> lvl · ${k + 1} lapis</span>`;
+        b.addEventListener('click', () => { if (g.applyEnchant && g.applyEnchant(t, k)) { this.renderScreen(); this.renderHotbar(); } });
+        opts.appendChild(b);
+      }
+      wrap.appendChild(opts); top.appendChild(wrap);
     } else if (this.tile && this.tile.type === 'chest') {
       left.appendChild(label('Chest'));
       top.appendChild(grid(this.tile.slots, 0, 27, 9));

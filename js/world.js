@@ -4,20 +4,21 @@ import { Noise, hash3 } from './noise.js';
 import { B, BLOCKS } from './blocks.js';
 import { tileIndex } from './textures.js';
 import { Settlements } from './structures.js';
+import { genNether, netherBiome, NETHER_BIOMES, fortressNear } from './nether.js';
 
 export const CS = 16, H = 80, SEA = 28;
 const M = 8, R = CS + M * 2, RH = H + 2, RR = R * R;
 
 // property tables
 export const OPAQUE = new Uint8Array(256), FILTER = new Uint8Array(256), EMIT = new Uint8Array(256),
-  SOLID = new Uint8Array(256), LIQUID = new Uint8Array(256), CUTOUT = new Uint8Array(256), CULLSAME = new Uint8Array(256), SHAPE = new Uint8Array(256);
-const SHAPES = { cube: 0, cross: 1, torch: 2, cactus: 3, slab: 4, post: 5 };
+  SOLID = new Uint8Array(256), TRANSL = new Uint8Array(256), LIQUID = new Uint8Array(256), CUTOUT = new Uint8Array(256), CULLSAME = new Uint8Array(256), SHAPE = new Uint8Array(256);
+const SHAPES = { cube: 0, cross: 1, torch: 2, cactus: 3, slab: 4, post: 5, table: 6, pane: 7 };
 export function initTables() {
   for (const b of BLOCKS) {
     if (!b) continue;
     OPAQUE[b.id] = b.opaque ? 1 : 0; FILTER[b.id] = b.opaque ? 15 : b.filter; EMIT[b.id] = b.light;
     SOLID[b.id] = b.solid ? 1 : 0; LIQUID[b.id] = b.liquid ? 1 : 0; CUTOUT[b.id] = b.cutout ? 1 : 0;
-    CULLSAME[b.id] = b.cullSame ? 1 : 0; SHAPE[b.id] = SHAPES[b.shape];
+    CULLSAME[b.id] = b.cullSame ? 1 : 0; TRANSL[b.id] = b.translucent ? 1 : 0; SHAPE[b.id] = SHAPES[b.shape];
   }
 }
 
@@ -94,11 +95,13 @@ export class World {
     this.rIds = new Uint8Array(RR * RH); this.rSky = new Uint8Array(RR * RH); this.rBlk = new Uint8Array(RR * RH);
     this.queue = new Int32Array(RR * RH * 2);
     this.loot = new Map(); this.crops = new Map();
-    this.settle = new Settlements(this);
+    this.settle = type === 'nether' ? null : new Settlements(this);
+    this.spawners = new Map(); this.portals = [];
   }
   // ---------- terrain ----------
   column(x, z) {
     if (this.type === 'flat') return { h: 4, biome: 0 };
+    if (this.type === 'nether') return { h: 40, biome: 10 + netherBiome(this, x, z) };
     const n = this.noise;
     const cont = n.fbm2(x / 700, z / 700, 3);
     const hills = n.fbm2(x / 140, z / 140, 4);
@@ -122,6 +125,7 @@ export class World {
   generate(cx, cz) {
     const chunk = { cx, cz, blocks: new Uint8Array(CS * CS * H), meta: new Uint8Array(CS * CS * H), mesh: null, water: null, dirty: true, built: false };
     this.chunks.set(ckey(cx, cz), chunk);
+    if (this.type === 'nether') return genNether(this, chunk);
     const bl = chunk.blocks, seed = this.seed, n = this.noise;
     const bx = cx * CS, bz = cz * CS;
     const heights = new Int16Array(CS * CS), biomes = new Uint8Array(CS * CS);
@@ -151,7 +155,8 @@ export class World {
               else if (r < 0.0215 && y < 30) id = B.GOLD_ORE;
               else if (r < 0.027 && y < 16) id = B.REDSTONE_ORE;
               else if (r < 0.0293 && y < 14) id = B.DIAMOND_ORE;
-              else if (r < 0.033 && biome === 4 && y > 30) id = B.EMERALD_ORE;
+              else if (r < 0.0318 && y < 32) id = B.LAPIS_ORE;
+              else if (r < 0.035 && biome === 4 && y > 30) id = B.EMERALD_ORE;
             }
           }
         } else if (y <= SEA) id = (biome === 3 && y === SEA) ? B.ICE : B.WATER;
@@ -202,6 +207,9 @@ export class World {
       const g = bl[lidx(x, h, z)], above = bl[lidx(x, h + 1, z)];
       if (above !== 0) continue;
       const r3 = hash3(wx, 9, wz, seed);
+      if ((g === B.GRASS || g === B.SAND) && h <= SEA + 1 && r3 > 0.8 && (bl[lidx(Math.min(15, x + 1), h, z)] === B.WATER || bl[lidx(Math.max(0, x - 1), h, z)] === B.WATER || bl[lidx(x, h, Math.min(15, z + 1))] === B.WATER || bl[lidx(x, h, Math.max(0, z - 1))] === B.WATER)) {
+        const ch = 1 + Math.floor(hash3(wx, 12, wz, seed) * 3); for (let k = 1; k <= ch; k++) bl[lidx(x, h + k, z)] = B.SUGAR_CANE; continue;
+      }
       if (g === B.GRASS) {
         if (r3 < (biome === 0 ? 0.12 : 0.06)) bl[lidx(x, h + 1, z)] = B.TALL_GRASS;
         else if (r3 < (biome === 0 ? 0.135 : 0.07)) bl[lidx(x, h + 1, z)] = hash3(wx, 10, wz, seed) < 0.5 ? B.DANDELION : B.POPPY;
@@ -367,14 +375,15 @@ export class World {
         continue;
       }
       const liquid = LIQUID[id];
-      const buf = liquid ? water : solid;
+      const buf = liquid || TRANSL[id] ? water : solid;
       const aboveSame = ids[ri + RR] === id;
-      const topH = liquid && !aboveSame ? Math.max(0.2, 0.875 - meta[lidx(x, y, z)] * 0.1) : shape === 4 ? 0.5625 : 1;
+      const topH = liquid && !aboveSame ? Math.max(0.2, 0.875 - meta[lidx(x, y, z)] * 0.1) : shape === 4 ? 0.5625 : shape === 6 ? 0.75 : 1;
       const m = b.tiles.front !== b.tiles.side ? meta[lidx(x, y, z)] : -1;
+      const pax = shape === 7 ? meta[lidx(x, y, z)] : 0;
       for (let f = 0; f < 6; f++) {
         const F = FACES[f];
         const nri = ri + F.nOff; const nid = ids[nri];
-        if (OPAQUE[nid] && !(shape === 4 && f === 2) && !((shape === 3 || shape === 5) && f !== 2 && f !== 3)) continue;
+        if (OPAQUE[nid] && !((shape === 4 || shape === 6) && f === 2) && !(shape === 7 && OPAQUE[nid] === 0) && !((shape === 3 || shape === 5) && f !== 2 && f !== 3)) continue;
         if (nid === id && CULLSAME[id]) continue;
         if (liquid && (LIQUID[nid] || (f === 2 && false))) continue;
         if (!liquid && LIQUID[id] === 0 && nid === id && shape !== 0 && !(shape === 5 && f !== 2 && f !== 3)) continue;
@@ -387,6 +396,7 @@ export class World {
           if (py === 1) py = topH;
           if (shape === 3 && F.n[1] === 0) { if (F.n[0]) px = px ? 15 / 16 : 1 / 16; if (F.n[2]) pz = pz ? 15 / 16 : 1 / 16; }
           else if (shape === 5) { px = px ? 10 / 16 : 6 / 16; pz = pz ? 10 / 16 : 6 / 16; }
+          else if (shape === 7) { if (pax) px = px ? 9 / 16 : 7 / 16; else pz = pz ? 9 / 16 : 7 / 16; }
           pos[v * 3] = x + px; pos[v * 3 + 1] = y + py; pos[v * 3 + 2] = z + pz;
           let [lu, lv] = F.uv[v]; if (F.side === 'side' && topH < 1 && cc[1] === 1) lv = topH;
           const uv = tileUV(tile, lu, lv); uvs[v * 2] = uv[0]; uvs[v * 2 + 1] = uv[1];

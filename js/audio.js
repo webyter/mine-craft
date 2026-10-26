@@ -67,6 +67,16 @@ export const sfx = {
   bell() { for (const [f, v] of [[880, 0.25], [1320, 0.12], [2210, 0.06]]) tone(f, 2.2, v, 'sine', 0.995); },
   trade() { tone(784, 0.1, 0.15, 'triangle'); tone(1047, 0.18, 0.15, 'triangle', 0, sfxGain, 0.08); },
   till() { noise(0.15, 500, 1, 0.6); },
+  portal() { tone(180, 2.5, 0.12, 'sawtooth', 1.6); tone(240, 2.5, 0.08, 'triangle', 1.4); noise(2.2, 900, 0.5, 0.18, 'bandpass', 0.6); },
+  portalTravel() { tone(120, 1.2, 0.2, 'sawtooth', 3); noise(1.0, 1500, 0.4, 0.35, 'bandpass', 0.05); },
+  ghast() { tone(520 + Math.random() * 200, 0.9, 0.18, 'sawtooth', 0.55); tone(700, 0.6, 0.1, 'triangle', 0.6, sfxGain, 0.1); },
+  ghastShoot() { tone(300, 0.4, 0.2, 'sawtooth', 0.4); noise(0.4, 600, 0.6, 0.4); },
+  blaze() { noise(0.8, 300, 0.4, 0.35, 'lowpass', 0.1); tone(90, 0.6, 0.12, 'sawtooth', 1.2); },
+  fireball() { noise(0.35, 1200, 0.6, 0.35, 'bandpass', 0.01); },
+  fizz() { noise(0.6, 5000, 0.5, 0.35, 'highpass', 0.01); },
+  enchant() { for (let i = 0; i < 5; i++) tone(900 + i * 220, 0.25, 0.08, 'triangle', 1.2, sfxGain, i * 0.06); },
+  slime() { noise(0.15, 300, 1.2, 0.5, 'lowpass'); tone(120, 0.12, 0.2, 'sine', 0.6); },
+  heart() { tone(660, 0.12, 0.12, 'sine', 1.3); tone(880, 0.16, 0.1, 'sine', 1.1, sfxGain, 0.1); },
   craft() { noise(0.1, 500, 2, 0.4); tone(660, 0.1, 0.1, 'triangle', 1, sfxGain, 0.05); },
 };
 
