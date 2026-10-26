@@ -1,16 +1,34 @@
 // Entities: mobs, dropped items, primed TNT, falling blocks, particles
 import * as THREE from 'three';
-import { SOLID, LIQUID, H } from './world.js';
+import { SOLID, LIQUID, H, SHAPE } from './world.js';
 import { B, I, BLOCKS, isBlock } from './blocks.js';
 import { iconFor } from './textures.js';
 import { sfx } from './audio.js';
 
 const EPS = 1e-4;
+// collision boxes that match each block's real shape
+const BOXBUF = [];
+function blockBoxes(world, x, y, z, out) {
+  const id = world.getBlock(x, y, z); if (!SOLID[id]) return;
+  const sh = SHAPE[id];
+  if (sh === 4) out.push(x, y, z, x + 1, y + 0.5625, z + 1);
+  else if (sh === 6) out.push(x, y, z, x + 1, y + 0.75, z + 1);
+  else if (sh === 3) out.push(x + 1 / 16, y, z + 1 / 16, x + 15 / 16, y + 1, z + 15 / 16);
+  else if (sh === 5) { if (id === B.FENCE) out.push(x, y, z, x + 1, y + 1.5, z + 1); else out.push(x + 6 / 16, y, z + 6 / 16, x + 10 / 16, y + 1, z + 10 / 16); }
+  else if (sh === 7) { if (world.getMeta && world.getMeta(x, y, z)) out.push(x + 7 / 16, y, z, x + 9 / 16, y + 1, z + 1); else out.push(x, y, z + 7 / 16, x + 1, y + 1, z + 9 / 16); }
+  else out.push(x, y, z, x + 1, y + 1, z + 1);
+}
+function gather(world, minx, miny, minz, maxx, maxy, maxz) {
+  BOXBUF.length = 0;
+  for (let x = Math.floor(minx); x <= Math.floor(maxx); x++)
+    for (let y = Math.floor(miny) - 1; y <= Math.floor(maxy); y++)
+      for (let z = Math.floor(minz); z <= Math.floor(maxz); z++) blockBoxes(world, x, y, z, BOXBUF);
+  return BOXBUF;
+}
+const OV = 1e-6;
 export function collides(world, minx, miny, minz, maxx, maxy, maxz) {
-  for (let x = Math.floor(minx); x <= Math.floor(maxx - EPS); x++)
-    for (let y = Math.floor(miny); y <= Math.floor(maxy - EPS); y++)
-      for (let z = Math.floor(minz); z <= Math.floor(maxz - EPS); z++)
-        if (SOLID[world.getBlock(x, y, z)]) return true;
+  const b = gather(world, minx, miny, minz, maxx, maxy, maxz);
+  for (let i = 0; i < b.length; i += 6) if (b[i + 3] > minx + OV && b[i] < maxx - OV && b[i + 4] > miny + OV && b[i + 1] < maxy - OV && b[i + 5] > minz + OV && b[i + 2] < maxz - OV) return true;
   return false;
 }
 export function inLiquid(world, e, id) {
@@ -18,31 +36,54 @@ export function inLiquid(world, e, id) {
   const b = world.getBlock(Math.floor(e.x), y, Math.floor(e.z));
   return id ? b === id : LIQUID[b];
 }
-// moves entity with collision, returns {hitX, hitZ}
+// swept AABB clip along one axis (no tunnelling at any speed)
+function clipAxis(bx, axis, d, box) {
+  const a = axis, o1 = (a + 1) % 3, o2 = (a + 2) % 3;
+  for (let i = 0; i < bx.length; i += 6) {
+    if (!(bx[i + 3 + o1] > box[o1] + OV && bx[i + o1] < box[3 + o1] - OV && bx[i + 3 + o2] > box[o2] + OV && bx[i + o2] < box[3 + o2] - OV)) continue;
+    if (d > 0 && bx[i + a] >= box[3 + a] - OV) d = Math.min(d, bx[i + a] - box[3 + a]);
+    else if (d < 0 && bx[i + 3 + a] <= box[a] + OV) d = Math.max(d, bx[i + 3 + a] - box[a]);
+  }
+  return d;
+}
+function sweep(world, e, dx, dy, dz) {
+  const w = e.w, h = e.h;
+  const box = [e.x - w, e.y, e.z - w, e.x + w, e.y + h, e.z + w];
+  const bx = gather(world, Math.min(box[0], box[0] + dx) - 0.01, Math.min(box[1], box[1] + dy) - 0.01, Math.min(box[2], box[2] + dz) - 0.01, Math.max(box[3], box[3] + dx) + 0.01, Math.max(box[4], box[4] + dy) + 0.01, Math.max(box[5], box[5] + dz) + 0.01);
+  const ry = clipAxis(bx, 1, dy, box); box[1] += ry; box[4] += ry;
+  const rx = clipAxis(bx, 0, dx, box); box[0] += rx; box[3] += rx;
+  const rz = clipAxis(bx, 2, dz, box); box[2] += rz; box[5] += rz;
+  return { rx, ry, rz };
+}
+// moves entity with collision + step-up, returns {hitX, hitZ}
 export function moveEntity(world, e, dx, dy, dz) {
-  const w = e.w, h = e.h; let hitX = false, hitZ = false;
-  e.onGround = false;
-  // Y
-  if (dy) {
-    e.y += dy;
-    if (collides(world, e.x - w, e.y, e.z - w, e.x + w, e.y + h, e.z + w)) {
-      if (dy < 0) { e.y = Math.floor(e.y) + 1 + EPS; e.onGround = true; } else e.y = Math.floor(e.y + h) - h - EPS;
-      e.vy = 0;
+  const wasGround = e.onGround;
+  let r = sweep(world, e, dx, dy, dz);
+  const blockedH = Math.abs(r.rx - dx) > 1e-7 || Math.abs(r.rz - dz) > 1e-7;
+  const sh = e.stepH || 0;
+  if (sh > 0 && blockedH && (wasGround || (dy < 0 && r.ry !== dy))) {
+    // try stepping up onto slabs / single small ledges
+    const ox = e.x, oy = e.y, oz = e.z;
+    const up = sweep(world, e, 0, sh, 0); e.y += up.ry;
+    const mv = sweep(world, e, dx, 0, dz); e.x += mv.rx; e.z += mv.rz;
+    const dn = sweep(world, e, 0, -up.ry - 0.01, 0); e.y += dn.ry;
+    const gained = mv.rx * mv.rx + mv.rz * mv.rz, base = r.rx * r.rx + r.rz * r.rz;
+    if (gained > base + 1e-6 && Math.abs(dn.ry - (-up.ry - 0.01)) > 1e-7) {
+      e.onGround = true; e.vy = Math.max(0, e.vy);
+      e.stepY = (e.stepY || 0) + (e.y - oy);
+      const hitX = Math.abs(mv.rx - dx) > 1e-7, hitZ = Math.abs(mv.rz - dz) > 1e-7;
+      if (hitX) e.vx = 0; if (hitZ) e.vz = 0;
+      return { hitX, hitZ, stepped: true };
     }
+    e.x = ox; e.y = oy; e.z = oz;
   }
-  if (dx) {
-    e.x += dx;
-    if (collides(world, e.x - w, e.y, e.z - w, e.x + w, e.y + h, e.z + w)) {
-      e.x = dx > 0 ? Math.floor(e.x + w) - w - EPS : Math.floor(e.x - w) + 1 + w + EPS; e.vx = 0; hitX = true;
-    }
-  }
-  if (dz) {
-    e.z += dz;
-    if (collides(world, e.x - w, e.y, e.z - w, e.x + w, e.y + h, e.z + w)) {
-      e.z = dz > 0 ? Math.floor(e.z + w) - w - EPS : Math.floor(e.z - w) + 1 + w + EPS; e.vz = 0; hitZ = true;
-    }
-  }
-  if (!e.onGround && e.vy <= 0 && collides(world, e.x - w, e.y - 0.02, e.z - w, e.x + w, e.y, e.z + w)) e.onGround = true;
+  e.x += r.rx; e.y += r.ry; e.z += r.rz;
+  const hitY = Math.abs(r.ry - dy) > 1e-7;
+  e.onGround = hitY && dy < 0;
+  if (hitY) e.vy = 0;
+  const hitX = Math.abs(r.rx - dx) > 1e-7, hitZ = Math.abs(r.rz - dz) > 1e-7;
+  if (hitX) e.vx = 0; if (hitZ) e.vz = 0;
+  if (!e.onGround && e.vy <= 0 && dy <= 0 && collides(world, e.x - e.w, e.y - 0.02, e.z - e.w, e.x + e.w, e.y, e.z + e.w)) e.onGround = true;
   return { hitX, hitZ };
 }
 
@@ -82,6 +123,7 @@ const MOBS = {
   zombified_piglin: { w: 0.3, h: 1.9, hp: 20, speed: 2.3, drops: [[I.ROTTEN_FLESH, 0, 1], [I.GOLD_NUGGET, 0, 2]], sound: 'zombie', neutral: true, dmg: 5, fireImmune: true },
   ghast: { w: 1.5, h: 3.4, hp: 10, speed: 1.6, drops: [[I.GHAST_TEAR, 0, 1], [I.GUNPOWDER, 0, 2]], sound: 'ghast', hostile: true, flying: true, fireImmune: true, big: true },
   blaze: { w: 0.3, h: 1.8, hp: 20, speed: 1.8, drops: [[I.BLAZE_ROD, 0, 1]], sound: 'blaze', hostile: true, hover: true, fireImmune: true },
+  slime: { w: 0.5, h: 1.0, hp: 8, speed: 2.2, drops: [[I.SLIME_BALL, 0, 2]], sound: 'slime', hostile: true, hopper: true, dmg: 3 },
   magma_cube: { w: 0.5, h: 1.0, hp: 8, speed: 2.4, drops: [[I.MAGMA_CREAM, 0, 1]], sound: 'slime', hostile: true, hopper: true, dmg: 4, fireImmune: true },
   enderman: { w: 0.3, h: 2.9, hp: 40, speed: 3.2, drops: [[I.ENDER_PEARL, 0, 1]], sound: 'ender', neutral: true, dmg: 7, solo: true },
   chicken: { w: 0.22, h: 0.7, hp: 4, speed: 1.2, drops: [[I.RAW_CHICKEN, 1, 1], [I.FEATHER, 0, 2]], sound: 'chicken', passive: true },
@@ -215,6 +257,11 @@ function buildModel(type, opts = {}) {
       const mem = new THREE.Mesh(new THREE.BoxGeometry(5.5, 0.06, 3.2), new THREE.MeshLambertMaterial({ color: 0x3a2a48, side: THREE.DoubleSide })); mats.push(mem.material); mem.position.set(s2 * 2.75, 0, -1.5); wing.add(mem);
     }
     for (const [lx, lz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) { const l = pivot(box(0.4, 1.2, 0.4, blk, mats), lx * 0.8, 1.0, lz * 1.3, -0.6); g.add(l); legs.push(l); }
+  } else if (type === 'slime') {
+    const outer = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshLambertMaterial({ color: 0x6ad85a, transparent: true, opacity: 0.55 })); mats.push(outer.material); outer.position.y = 0.5; g.add(outer); arms.push(outer);
+    const core = box(0.55, 0.55, 0.55, 0x3a9a30, mats); core.position.y = 0.45; g.add(core);
+    head = new THREE.Group(); head.position.set(0, 0.6, 0); g.add(head);
+    for (const s of [-1, 1]) { const e = box(0.14, 0.14, 0.02, 0x1a3a14, mats); e.position.set(s * 0.2, 0.05, 0.51); head.add(e); }
   } else if (type === 'magma_cube') {
     for (let k = 0; k < 4; k++) { const sl = box(0.98, 0.22, 0.98, k % 2 ? 0x5a1a10 : 0x3a0e08, mats); sl.position.y = 0.12 + k * 0.24; g.add(sl); arms.push(sl); }
     head = new THREE.Group(); head.position.set(0, 0.6, 0); g.add(head);
@@ -350,6 +397,7 @@ export class EntityManager {
     const m = { type, def, model, x, y, z, vx: 0, vy: 0, vz: 0, w: def.w, h: def.h, hp: def.hp, yaw: Math.random() * 6.28, targetYaw: 0,
       walk: 0, wanderT: 0, moving: false, hurt: 0, attackCd: 0, fuse: 0, onGround: false, dead: 0, sayT: 4 + Math.random() * 10, burn: 0, shootCd: 2, prof: opts.prof, home: opts.home || null, plan: opts.plan || null, baby: !!opts.baby, growT: opts.baby ? 120 : 0, breedCd: opts.baby || !def.villager ? 0 : 20 + Math.random() * 40, willing: 0, fireT: 0 };
     if (opts.baby) { m.h = def.h * 0.55; m.w = def.w * 0.7; }
+    m.stepH = def.flying || def.hopper || def.boss || def.crystal ? 0 : 0.6;
     if (type === 'ghast') m.alt = y;
     this.mobs.push(m); return m;
   }
@@ -501,11 +549,11 @@ export class EntityManager {
           if (distP < 3) { if (m.fuse === 0) sfx.hiss(); m.fuse += dt; } else m.fuse = Math.max(0, m.fuse - dt);
           const s = 1 + Math.min(1, m.fuse / 1.5) * 0.25 * (Math.sin(m.fuse * 20) > 0 ? 1 : 0.5);
           m.model.g.scale.set(s, 1, s);
-          if (m.fuse > 1.5) { this.scene.remove(m.model.g); this.mobs.splice(i, 1); g.explode(m.x, m.y + 1, m.z, 3); continue; }
+          if (m.fuse > 1.5) { this.scene.remove(m.model.g); this.mobs.splice(i, 1); g.explode(m.x, m.y + 1, m.z, m.charged ? 6 : 3); continue; }
         } else if (m.type === 'skeleton') {
           m.shootCd -= dt;
           if (m.shootCd < 0 && distP < 16) { m.shootCd = 2 + Math.random(); this.shootArrow(m, pl); }
-        } else if (md.golem) { /* handled above */ } else if (distP < 1.4 && m.attackCd <= 0) { m.attackCd = 1; g.damagePlayer(md.dmg * [0, 0.5, 1, 1.5][g.difficulty], m.x, m.z); }
+        } else if (md.golem) { /* handled above */ } else if (distP < 1.4 && m.attackCd <= 0) { m.attackCd = 1; g.lastAttacker = m; g.damagePlayer(md.dmg * [0, 0.5, 1, 1.5][g.difficulty], m.x, m.z); }
       } else if (m.type === 'creeper') { m.fuse = 0; m.model.g.scale.set(1, 1, 1); }
       // burn in daylight
       if (md.burns && g.daylight > 0.75 && !inWater && w.topSolid(Math.floor(m.x), Math.floor(m.z)) < m.y + m.h) {
@@ -645,7 +693,7 @@ export class EntityManager {
         m.shootCd -= dt;
         if (m.shootCd < 0 && los()) { m.shootCd = 4.5 + Math.random() * 2; m.volley = 3; m.volleyT = 0; sfx.blaze(); }
         if (m.volley > 0) { m.volleyT -= dt; if (m.volleyT <= 0) { m.volleyT = 0.32; m.volley--; this.shootFireball(m, false); } }
-        if (distP < 1.4 && m.attackCd <= 0) { m.attackCd = 1; g.damagePlayer(6 * diff, m.x, m.z); }
+        if (distP < 1.4 && m.attackCd <= 0) { m.attackCd = 1; g.lastAttacker = m; g.damagePlayer(6 * diff, m.x, m.z); }
       } else {
         m.wanderT -= dt; if (m.wanderT < 0) { m.wanderT = 2 + Math.random() * 4; m.targetYaw = Math.random() * 6.28; m.moving = Math.random() < 0.5; m.homeY = m.y + (Math.random() - 0.5) * 2; }
         sp = m.moving ? md.speed * 0.4 : 0;
@@ -656,7 +704,7 @@ export class EntityManager {
       moveEntity(w, m, m.vx * dt, m.vy * dt, m.vz * dt);
       m.walk += dt; m.model.arms[0].rotation.y = m.walk * 2.5; m.model.arms[0].position.y = 0.9 + Math.sin(m.walk * 3) * 0.08;
       if (Math.random() < dt * 6) this.burst(m.x, m.y + 0.6, m.z, [1, 0.6, 0.15], 1, 0.8, 0.08, 0.5);
-    } else if (m.type === 'magma_cube') {
+    } else if (m.type === 'magma_cube' || m.type === 'slime') {
       const chase = targetable && distP < 16;
       m.vy -= 28 * dt; m.vy = Math.max(m.vy, -40);
       if (m.onGround) {

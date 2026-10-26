@@ -1,6 +1,6 @@
 // Inventory model + HUD + container screens
 import { iconFor } from './textures.js';
-import { itemName, maxStack, maxDur, matchRecipe, CREATIVE_LIST, isBlock, isTool, BLOCKS, ITEMS, SMELT, FUEL, I, enchText, enchKind, ENCH } from './blocks.js';
+import { itemName, maxStack, maxDur, matchRecipe, CREATIVE_LIST, isBlock, isTool, BLOCKS, ITEMS, SMELT, FUEL, I, enchText, enchKind, ENCH, isArmor, armorInfo } from './blocks.js';
 import { sfx } from './audio.js';
 
 export class Inventory {
@@ -42,6 +42,8 @@ const HEART = ['.kk.kk.', 'krrkrrk', 'krwrrrk', 'krrrrrk', '.krrrk.', '..krk..',
 const HEART_HALF = ['.kk.kk.', 'krrkddk', 'krwdddk', 'krrdddk', '.krddk.', '..kdk..', '...k...'];
 const DRUM = ['....kk.', '...kbbk', '..kbbbk', '.kmmbk.', 'kmmmk..', 'kwk....', '.k.....'];
 const DRUM_HALF = ['....kk.', '...kddk', '..kdddk', '.kmmdk.', 'kmmmk..', 'kwk....', '.k.....'];
+const ARM = ['kk...kk', 'kwkkkwk', 'kwwwwwk', '.kwwwk.', '.kwwwk.', '.kwwwk.', '.kkkkk.'];
+const ARM_HALF = ['kk...kk', 'kwkkkdk', 'kwwwddk', '.kwwdk.', '.kwwdk.', '.kwwdk.', '.kkkkk.'];
 const BUB = ['..kkk..', '.kbbbk.', 'kbwbbbk', 'kbbbbbk', 'kbbbbbk', '.kbbbk.', '..kkk..'];
 const ICONS = {};
 function icons() {
@@ -52,15 +54,17 @@ function icons() {
   ICONS.f = pix(DRUM, { k: '#2a1500', b: '#c8742a', m: '#7a3a10', w: '#eee' });
   ICONS.fh = pix(DRUM_HALF, { k: '#2a1500', b: '#c8742a', m: '#7a3a10', w: '#eee', d: '#3a2010' });
   ICONS.fe = pix(DRUM, { k: '#2a1500', b: '#3a2010', m: '#3a2010', w: '#3a2010' });
+  ICONS.a = pix(ARM, { k: '#1a1a1a', w: '#d8d8d8' }); ICONS.ah = pix(ARM_HALF, { k: '#1a1a1a', w: '#d8d8d8', d: '#3a3a3a' }); ICONS.ae = pix(ARM, { k: '#1a1a1a', w: '#3a3a3a' });
   ICONS.b = pix(BUB, { k: '#0a2a6a', b: '#3a8ae8', w: '#e0f0ff' });
   return ICONS;
 }
 
+const EQUIP = new Set([114, 309, 121, 307, 308, 340, 341, 342, 343, 345, 349, 350, 128]);
 const TABS = {
   Construction: (id) => isBlock(id) && ![9, 22, 24, 32, 33, 34, 55, 1, 2, 18, 6, 7, 20, 46, 13, 14, 15, 16, 17, 19, 47].includes(id),
   Nature: (id) => isBlock(id) && [1, 2, 18, 6, 7, 9, 22, 24, 32, 33, 34, 55, 20, 46, 13, 14, 15, 16, 17, 19, 47, 8, 21, 23, 42, 5].includes(id),
-  Equipment: (id) => isTool(id) || id === 114,
-  Items: (id) => !isBlock(id) && !isTool(id) && id !== 114,
+  Equipment: (id) => isTool(id) || isArmor(id) || EQUIP.has(id),
+  Items: (id) => !isBlock(id) && !isTool(id) && !isArmor(id) && !EQUIP.has(id),
 };
 
 export class UI {
@@ -105,7 +109,8 @@ export class UI {
     if (this.screen) this.renderScreen();
   }
   renderStats(p, mode) {
-    const key = [mode, Math.ceil(p.health), Math.ceil(p.food), Math.ceil(p.air / 30), p.level, Math.round(p.xp * 50)].join(',');
+    const ap = this.game.armorPoints ? this.game.armorPoints() : 0;
+    const key = [mode, ap, Math.ceil(p.health), Math.ceil(p.food), Math.ceil(p.air / 30), p.level, Math.round(p.xp * 50)].join(',');
     if (key === this.lastStats) return; this.lastStats = key;
     const I = icons(); const show = mode === 'survival';
     const hearts = this.$('hearts'), hunger = this.$('hunger'), bub = this.$('bubbles');
@@ -118,6 +123,8 @@ export class UI {
     let f = '';
     for (let i = 9; i >= 0; i--) { const v = p.food - i * 2; f += `<img src="${v >= 2 ? I.f : v >= 1 ? I.fh : I.fe}" alt="">`; }
     hunger.innerHTML = f;
+    let a = ''; if (ap > 0) for (let i = 0; i < 10; i++) { const v = ap - i * 2; a += `<img src="${v >= 2 ? I.a : v >= 1 ? I.ah : I.ae}" alt="">`; }
+    this.$('armorbar').innerHTML = a;
     let b = ''; if (p.air < 300) { const n = Math.ceil(p.air / 30); for (let i = 0; i < n; i++) b += `<img src="${I.b}" alt="">`; }
     bub.innerHTML = b;
     this.$('xp-fill').style.width = (p.xp * 100) + '%';
@@ -170,6 +177,7 @@ export class UI {
       else { this.cursor = s; arr[i] = null; }
     } else {
       if (this.tile && this.tile.type === 'furnace' && arr === this.tile.slots && i === 2) return; // output only
+      if (arr === this.game.player.armor && !(isArmor(c.id) && armorInfo(c.id).piece === i)) return; // armor slot
       if (this.tile && this.tile.type === 'enchant' && arr === this.tile.slots && i === 1 && c.id !== I.LAPIS) return; // lapis only
       if (this.tile && this.tile.type === 'enchant' && arr === this.tile.slots && i === 0 && !s && c.count > 1) { arr[0] = { ...c, count: 1 }; c.count--; sfx.click(); this.renderScreen(); this.renderHotbar(); return; }
       if (!s) {
@@ -249,6 +257,7 @@ export class UI {
     const right = document.createElement('div'); right.className = 'inv-col';
     const top = document.createElement('div'); top.className = 'inv-top';
     if (this.craft) {
+      if (this.craft.n === 2 && this.game.player.armor) { const ar = document.createElement('div'); ar.className = 'armor-col'; ar.appendChild(label('Armor')); ar.appendChild(grid(this.game.player.armor, 0, 4, 4, { cls: 'armor-slot' })); left.appendChild(ar); }
       left.appendChild(label(this.craft.n === 2 ? 'Crafting' : 'Crafting Table'));
       top.appendChild(grid(this.craft.grid, 0, this.craft.grid.length, this.craft.n));
       const ar = document.createElement('div'); ar.className = 'arrow'; ar.textContent = '➜'; top.appendChild(ar);

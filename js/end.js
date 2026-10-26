@@ -228,6 +228,8 @@ function buildStronghold(w, chunk, p, bx, bz) {
     else { const x0 = ax < 0 ? sx - 6 - L : sx + 6, x1 = ax < 0 ? sx - 6 : sx + 6 + L; room(x0, Y, sz - 2, x1, Y + 4, sz + 2, 'x'); ends.push({ x: ax < 0 ? x0 - 4 : x1 + 4, z: sz, k }); }
     // torches along the corridor
     for (let t = 8; t < L; t += 7) { const x = sx + ax * (6 + t) + (az ? -1 : 0), z = sz + az * (7 + t) + (ax ? -1 : 0); set(x, Y + 1, z, B.TORCH); }
+    // cobwebs in the upper corners and a ladder shaft
+    for (let t = 5; t < L; t += 4) { if (hash3(t, k, 5, w.seed) < 0.45) { const x = sx + ax * (6 + t) + (az ? (t % 8 < 4 ? -1 : 1) : 0), z = sz + az * (7 + t) + (ax ? (t % 8 < 4 ? -1 : 1) : 0); set(x, Y + 3, z, B.COBWEB); } }
   });
   // end rooms: library / storeroom / fountain
   for (const e of ends) {

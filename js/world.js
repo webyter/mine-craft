@@ -13,7 +13,7 @@ const M = 8, R = CS + M * 2, RH = H + 2, RR = R * R;
 // property tables
 export const OPAQUE = new Uint8Array(256), FILTER = new Uint8Array(256), EMIT = new Uint8Array(256),
   SOLID = new Uint8Array(256), TRANSL = new Uint8Array(256), LIQUID = new Uint8Array(256), CUTOUT = new Uint8Array(256), CULLSAME = new Uint8Array(256), SHAPE = new Uint8Array(256);
-const SHAPES = { cube: 0, cross: 1, torch: 2, cactus: 3, slab: 4, post: 5, table: 6, pane: 7 };
+const SHAPES = { cube: 0, cross: 1, torch: 2, cactus: 3, slab: 4, post: 5, table: 6, pane: 7, ladder: 8 };
 export function initTables() {
   for (const b of BLOCKS) {
     if (!b) continue;
@@ -372,9 +372,10 @@ export class World {
       const ri = (y + 1) * RR + (z + M) * R + (x + M);
       const id = ids[ri]; if (!id) continue;
       const b = BLOCKS[id]; const shape = SHAPE[id];
-      if (shape === 1 || shape === 2) { // cross / torch
+      if (shape === 1 || shape === 2 || shape === 8) { // cross / torch / ladder
         const s = sky[ri] / 15, bk = blk[ri] / 15; const t = b.tiles.side;
-        if (shape === 1) this.cross(solid, x, y, z, t, s, bk);
+        if (shape === 8) this.ladder(solid, x, y, z, t, s, bk, meta[lidx(x, y, z)]);
+        else if (shape === 1) this.cross(solid, x, y, z, t, s, bk);
         else this.torch(solid, x, y, z, t, s, bk);
         continue;
       }
@@ -435,6 +436,15 @@ export class World {
         buf.quad(p, uv, l, false);
       }
     }
+  }
+  ladder(buf, x, y, z, t, s, bk, m) {
+    const o = 1 / 16; let q;
+    if (m === 0) q = [[1, 0, 1 - o], [0, 0, 1 - o], [0, 1, 1 - o], [1, 1, 1 - o]];
+    else if (m === 1) q = [[0, 0, o], [1, 0, o], [1, 1, o], [0, 1, o]];
+    else if (m === 2) q = [[1 - o, 0, 0], [1 - o, 0, 1], [1 - o, 1, 1], [1 - o, 1, 0]];
+    else q = [[o, 0, 1], [o, 0, 0], [o, 1, 0], [o, 1, 1]];
+    const l = [s, bk, 0.85, s, bk, 0.85, s, bk, 0.85, s, bk, 0.85]; const uvl = [[0, 0], [1, 0], [1, 1], [0, 1]];
+    for (const rev of [false, true]) { const order = rev ? [3, 2, 1, 0] : [0, 1, 2, 3]; const p = [], uv = []; for (const k of order) { p.push(x + q[k][0], y + q[k][1], z + q[k][2]); const u = tileUV(t, uvl[k][0], uvl[k][1]); uv.push(u[0], u[1]); } buf.quad(p, uv, l, false); }
   }
   torch(buf, x, y, z, t, s, bk) {
     const a = 7 / 16, b = 9 / 16, top = 12 / 16;

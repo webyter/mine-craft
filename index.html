@@ -112,11 +112,13 @@
     <button class="hud-btn" id="btn-chat" aria-label="Chat and commands"><svg viewBox="0 0 16 16"><path d="M2 3h12v8H7l-3 3v-3H2z" fill="none" stroke="currentColor" stroke-width="1.6"/></svg></button>
     <button class="hud-btn" id="btn-pause" aria-label="Pause"><svg viewBox="0 0 16 16"><rect x="4" y="3" width="3" height="10" fill="currentColor"/><rect x="9" y="3" width="3" height="10" fill="currentColor"/></svg></button>
   </div>
+  <div id="held-info" class="hidden"></div>
   <div id="bossbar" class="hidden"><div id="bossbar-name">Ender Dragon</div><div class="bb-track"><div id="bossbar-fill"></div></div></div>
   <div id="chat-log"></div>
   <div id="toast"></div>
   <div id="bottom">
     <div id="stats">
+      <div id="armorbar" class="statrow"></div>
       <div id="hearts" class="statrow"></div>
       <div id="bubbles" class="statrow right"></div>
       <div id="hunger" class="statrow right"></div>
@@ -192,5 +194,6 @@
 <div id="rotate-hint" class="hidden">Turn your phone sideways for the best view</div>
 
 <script type="module" src="./js/main.js"></script>
+<div id="flash"></div>
 </body>
 </html>

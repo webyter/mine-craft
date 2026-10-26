@@ -1,7 +1,7 @@
 // Mine Craft — main game
 import * as THREE from 'three';
 import { hashSeed, mulberry32 } from './noise.js';
-import { B, I, BLOCKS, ITEMS, isBlock, isTool, toolInfo, toolId, itemName, maxDur, maxStack, SMELT, FUEL, CREATIVE_LIST, ENCH, enchKind, enchLevel, enchText, rollEnchants } from './blocks.js';
+import { B, I, BLOCKS, ITEMS, isBlock, isTool, toolInfo, toolId, itemName, maxDur, maxStack, SMELT, FUEL, CREATIVE_LIST, ENCH, enchKind, enchLevel, enchText, rollEnchants, isArmor, armorInfo, armorId } from './blocks.js';
 import { fortressNear, NETHER_BIOMES, netherBiome } from './nether.js';
 import { endPillars, strongholdNear, endCityNear, FRAME_RING, GATEWAY, GATE_ISLAND, ARRIVAL, END_TOP } from './end.js';
 import { buildAtlas, tileIndex, iconFor } from './textures.js';
@@ -165,7 +165,7 @@ window.__game = game;
 const player = game.player = {
   x: 0, y: 40, z: 0, vx: 0, vy: 0, vz: 0, w: 0.3, h: 1.8, yaw: 0, pitch: 0, onGround: false, flying: false, sneaking: false, sprinting: false,
   health: 20, food: 20, sat: 5, exh: 0, air: 300, fallStart: null, dead: false, xp: 0, level: 0, hurtCd: 0, regenT: 0, starveT: 0,
-  stepDist: 0, bob: 0, spawn: { x: 0.5, y: 40, z: 0.5 }, lavaT: 0, inWater: false, inLava: false, headInWater: false,
+  stepDist: 0, bob: 0, stepH: 0.6, stepY: 0, armor: [null, null, null, null], spawn: { x: 0.5, y: 40, z: 0.5 }, lavaT: 0, inWater: false, inLava: false, headInWater: false,
 };
 const ui = new UI(game);
 game.ui = ui;
@@ -218,7 +218,7 @@ function newWorld({ seedText = '', mode = 'survival', difficulty = 2, type = 'in
   game.world = new World(seed, type); game.dim = 'overworld'; game.dims = { overworld: { world: game.world } }; game.mode = mode; game.difficulty = difficulty; game.worldName = name;
   game.ticks = 1000; game.raining = false; game.rainT = 900 + Math.random() * 1200;
   if (!ents) ents = new EntityManager(game); else { ents.world = game.world; }
-  player.elytra = null; player.gliding = false; game.endState = null; if (typeof setElytraBtn === 'function') setElytraBtn();
+  player.elytra = null; player.gliding = false; game.endState = null; player.armor = [null, null, null, null]; player.boat = null; game.thunder = false; if (typeof setElytraBtn === 'function') setElytraBtn();
   player.portalT = 0; player.portalCd = false; player.enchSeed = (Math.random() * 1e9) | 0;
   game.ents = ents;
   game.inv.clear(); game.inv.sel = 0;
@@ -374,13 +374,42 @@ let hurtFlash = null, shake = 0;
 game.damagePlayer = (amount, fx, fz, cause = 'mob') => {
   if (game.mode !== 'survival' || player.dead || amount <= 0) return;
   if (player.hurtCd > 0 && cause !== 'starve') return;
+  // shield: sneak while holding a shield to block attacks from the front
+  const sh = game.inv.held();
+  if (sh && sh.id === I.SHIELD && player.sneaking && ['mob', 'explode', 'arrow', 'dragon', 'enderman'].includes(cause)) {
+    let front = true; if (fx !== undefined) { const lx = -Math.sin(player.yaw), lz = -Math.cos(player.yaw); front = (fx - player.x) * lx + (fz - player.z) * lz > 0; }
+    if (front) { sfx.shield(); player.hurtCd = 0.3; game.inv.damageHeld(Math.max(1, Math.floor(amount / 2))); if (fx !== undefined) { const dx = player.x - fx, dz = player.z - fz, d = Math.hypot(dx, dz) || 1; player.vx += dx / d * 3; player.vz += dz / d * 3; } return; }
+  }
+  amount = armorReduce(amount, cause);
+  if (amount <= 0) { player.hurtCd = 0.5; return; }
   player.hurtCd = 0.5; player.health -= amount; sfx.hurt(); shake = 0.25;
   if (fx !== undefined) { const dx = player.x - fx, dz = player.z - fz, d = Math.hypot(dx, dz) || 1; player.vx += dx / d * 7; player.vz += dz / d * 7; player.vy = Math.max(player.vy, 5); }
   hurtFlash.style.opacity = 1; setTimeout(() => (hurtFlash.style.opacity = 0), 200);
   player.exh += 0.1;
   if (player.health <= 0) die(cause);
 };
-const DEATH_MSG = { mob: 'was slain by a monster', fall: 'fell from a high place', lava: 'tried to swim in lava', drown: 'drowned', starve: 'starved to death', explode: 'blew up', void: 'fell out of the world', cactus: 'was pricked to death', dragon: 'was slain by the Ender Dragon', kinetic: 'experienced kinetic energy', enderman: 'was slain by an Enderman' };
+game.armorPoints = () => player.armor ? player.armor.reduce((a, s) => a + (s ? armorInfo(s.id).def : 0), 0) : 0;
+function armorReduce(amount, cause) {
+  if (['void', 'starve', 'drown', 'kill'].includes(cause)) return amount;
+  let a = amount; const ar = player.armor || [];
+  const def = game.armorPoints(); const tough = ar.reduce((t, s) => t + (s ? armorInfo(s.id).tough : 0), 0);
+  if (def > 0 && cause !== 'fall' && cause !== 'fire' && cause !== 'lava') {
+    a *= 1 - Math.min(20, Math.max(def / 5, def - a / (2 + tough / 4))) / 25;
+    // armor wears out
+    for (let i = 0; i < 4; i++) { const s = ar[i]; if (!s) continue; const ub = enchLevel(s, 'unbreaking'); if (ub && Math.random() < ub / (ub + 1)) continue; s.dur = (s.dur ?? 100) - Math.max(1, Math.floor(amount / 4)); if (s.dur <= 0) { ar[i] = null; sfx.brk(B.IRON_BLOCK); toast(itemName(s.id) + ' broke'); } }
+  }
+  let epf = 0; for (const s of ar) if (s) { epf += enchLevel(s, 'protection'); if (cause === 'fall' && armorInfo(s.id).piece === 3) epf += enchLevel(s, 'feather_falling') * 3; }
+  a *= 1 - Math.min(20, epf) * 0.04;
+  // thorns
+  if (cause === 'mob' && game.lastAttacker && !game.lastAttacker.dead) { let th = 0; for (const s of ar) if (s) th += enchLevel(s, 'thorns'); if (th && Math.random() < 0.15 * th) ents.hurtMob(game.lastAttacker, 1 + Math.floor(Math.random() * 4), player.x, player.z); }
+  return Math.round(a * 2) / 2;
+}
+function equipArmor() {
+  const h = game.inv.held(); const piece = armorInfo(h.id).piece; const old = player.armor[piece];
+  player.armor[piece] = { ...h, count: 1 }; game.inv.slots[game.inv.sel] = old || null; game.inv.onChange(); sfx.armor(); ui.lastStats = '';
+  toast(itemName(h.id) + ' equipped');
+}
+const DEATH_MSG = { mob: 'was slain by a monster', fall: 'fell from a high place', lava: 'tried to swim in lava', drown: 'drowned', starve: 'starved to death', explode: 'blew up', void: 'fell out of the world', cactus: 'was pricked to death', dragon: 'was slain by the Ender Dragon', kinetic: 'experienced kinetic energy', enderman: 'was slain by an Enderman', fire: 'went up in flames', lightning: 'was struck by lightning', kill: 'died' };
 function die(cause) {
   player.dead = true; player.health = 0;
   for (let i = 0; i < 36; i++) { const s = game.inv.slots[i]; if (s) ents.dropItem(s.id, s.count, player.x, player.y + 1, player.z, (Math.random() - 0.5) * 6, 4, (Math.random() - 0.5) * 6, s.dur, s.ench); }
@@ -582,6 +611,202 @@ function finishArrival() {
   toast(game.dim === 'nether' ? 'The Nether' : game.dim === 'end' ? (wasEnd === 'outer' ? 'The Outer End Islands' : 'The End') : game.worldName, 2000); resize();
 }
 game.switchDim = switchDim;
+// ---------- physics helpers ----------
+function armorEnch(piece, key) { const s = player.armor && player.armor[piece]; return enchLevel(s, key); }
+function waterFlow(w, x, y, z) {
+  if (w.getBlock(x, y, z) !== B.WATER) return null;
+  const m = w.getMeta(x, y, z); let fx = 0, fz = 0; const down = w.getBlock(x, y + 1, z) === B.WATER && m > 0;
+  for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+    const n = w.getBlock(x + dx, y, z + dz);
+    if (n === B.WATER) { const nm = w.getMeta(x + dx, y, z + dz); if (nm > m) { fx += dx * (nm - m); fz += dz * (nm - m); } else if (nm < m) { fx -= dx * (m - nm) * 0.5; fz -= dz * (m - nm) * 0.5; } }
+    else if (!SOLID[n] && m > 0 && w.getBlock(x + dx, y - 1, z + dz) !== B.WATER && !SOLID[w.getBlock(x + dx, y - 1, z + dz)]) { fx += dx * 2; fz += dz * 2; }
+  }
+  const l = Math.hypot(fx, fz); if (l < 0.01 && !down) return null;
+  return [l ? fx / l : 0, l ? fz / l : 0, down];
+}
+// ---------- boats ----------
+const boats = []; game.boats = boats;
+function makeBoatMesh() {
+  const g = new THREE.Group(); const wood = new THREE.MeshLambertMaterial({ color: 0x9c7a48 }), dark = new THREE.MeshLambertMaterial({ color: 0x6b4a24 });
+  const add = (w2, h2, d2, x, y, z, m) => { const b = new THREE.Mesh(new THREE.BoxGeometry(w2, h2, d2), m); b.position.set(x, y, z); g.add(b); return b; };
+  add(1.3, 0.12, 2.2, 0, 0.06, 0, dark);
+  add(0.1, 0.42, 2.2, -0.65, 0.3, 0, wood); add(0.1, 0.42, 2.2, 0.65, 0.3, 0, wood);
+  add(1.3, 0.42, 0.1, 0, 0.3, -1.1, wood); add(1.3, 0.42, 0.1, 0, 0.3, 1.1, wood);
+  add(1.2, 0.08, 0.3, 0, 0.36, 0.2, dark);
+  for (const s2 of [-1, 1]) { const o = add(0.08, 0.08, 1.4, s2 * 0.85, 0.42, 0, dark); o.rotation.x = 0.3; o.userData.oar = s2; }
+  return g;
+}
+function placeBoat(x, y, z) {
+  const mesh = makeBoatMesh(); scene.add(mesh);
+  const b = { x, y, z, vy: 0, yaw: player.yaw + Math.PI, speed: 0, w: 0.68, h: 0.55, onGround: false, mesh, oarT: 0 };
+  boats.push(b); return b;
+}
+function boatWaterTop(w, b) {
+  const x = Math.floor(b.x), z = Math.floor(b.z);
+  for (let y = Math.floor(b.y + 0.6); y >= Math.floor(b.y - 1); y--) if (w.getBlock(x, y, z) === B.WATER && w.getBlock(x, y + 1, z) !== B.WATER) return y + 0.88;
+  return null;
+}
+function updateBoats(dt) {
+  const w = game.world;
+  for (let i = boats.length - 1; i >= 0; i--) {
+    const b = boats[i]; if (!w.isLoaded(Math.floor(b.x), Math.floor(b.z))) continue;
+    const top = boatWaterTop(w, b);
+    if (top !== null) { b.vy += ((top - 0.32) - b.y) * 18 * dt; b.vy *= 1 - dt * 4; b.onWater = true; }
+    else { b.vy -= 28 * dt; b.onWater = false; }
+    if (!b.onWater && b.onGround) b.speed *= Math.max(0, 1 - dt * 6);
+    else b.speed *= Math.max(0, 1 - dt * (b === (player.boat) ? 0.6 : 1.5));
+    const fx = -Math.sin(b.yaw + Math.PI), fz = -Math.cos(b.yaw + Math.PI);
+    const r = moveEntity(w, b, fx * b.speed * dt, b.vy * dt, fz * b.speed * dt);
+    if ((r.hitX || r.hitZ) && Math.abs(b.speed) > 2) b.speed *= -0.25;
+    b.mesh.position.set(b.x, b.y, b.z); b.mesh.rotation.y = b.yaw;
+    b.mesh.rotation.z = Math.sin(performance.now() / 700 + i) * (b.onWater ? 0.03 : 0);
+    if (b.y < -20) { scene.remove(b.mesh); boats.splice(i, 1); }
+  }
+}
+function updateBoatRide(dt, blocked) {
+  const p = player, b = p.boat; const w = game.world;
+  let mx = 0, mz = 0;
+  if (!blocked) { if (keys.w || keys.arrowup) mz -= 1; if (keys.s || keys.arrowdown) mz += 1; if (keys.a || keys.arrowleft) mx -= 1; if (keys.d || keys.arrowright) mx += 1; if (joy.id !== null) { mx += joy.x; mz += joy.y; } }
+  const acc = b.onWater ? 9 : 1.5, max = b.onWater ? 8 : 1.2;
+  b.speed += -mz * acc * dt; b.speed = Math.max(-max * 0.4, Math.min(max, b.speed));
+  b.yaw -= mx * 1.9 * dt * (b.onWater ? 1 : 0.4);
+  if (Math.abs(mz) > 0.2 || Math.abs(mx) > 0.2) { b.oarT += dt * 7; b.mesh.children.forEach((c) => { if (c.userData.oar) c.rotation.x = 0.3 + Math.sin(b.oarT) * 0.5; }); if (Math.sin(b.oarT) > 0.97 && b.onWater) sfx.paddle(); }
+  p.x = b.x; p.z = b.z; p.y = b.y - 0.25; p.vx = p.vy = p.vz = 0; p.onGround = true; p.fallStart = null; p.sneaking = p.sprinting = false;
+  p.inWater = false; p.headInWater = w.getBlock(Math.floor(p.x), Math.floor(p.y + 1.62), Math.floor(p.z)) === B.WATER;
+  const jump = !blocked && (jumpHeld || keys.space);
+  if (jump && !p._jumpPrev && p.boatT > 0.4) leaveBoat();
+  p._jumpPrev = jump; p.boatT = (p.boatT || 0) + dt;
+}
+function leaveBoat() {
+  const p = player, b = p.boat; if (!b) return; p.boat = null; const w = game.world;
+  for (const [dx, dz] of [[1.3, 0], [-1.3, 0], [0, 1.3], [0, -1.3], [0, 0]]) {
+    const x = b.x + dx, z = b.z + dz; const y = b.y + 0.3;
+    if (!collides(w, x - p.w, y, z - p.w, x + p.w, y + p.h, z + p.w)) { p.x = x; p.y = y; p.z = z; break; }
+  }
+  p.y += 0.2; toast('Left the boat');
+}
+function rayHitBoat(o, d, maxT = 5) {
+  let best = null, bt = maxT;
+  for (const b of boats) { const cx = b.x - o.x, cy = b.y + 0.3 - o.y, cz = b.z - o.z; const t = cx * d.x + cy * d.y + cz * d.z; if (t < 0 || t > bt) continue; const px = o.x + d.x * t - b.x, py = o.y + d.y * t - b.y - 0.3, pz = o.z + d.z * t - b.z; if (Math.hypot(px, py * 2, pz) < 1.1) { best = b; bt = t; } }
+  return best;
+}
+// ---------- fishing ----------
+let bobber = null;
+function castRod(sx, sy) {
+  if (bobber) { reelIn(); return; }
+  const lp = pickLiquid(sx, sy); const o = camera.position; const d = new THREE.Vector3(); camera.getWorldDirection(d);
+  let hx, hy, hz;
+  const h = game.world.raycast(o.x, o.y, o.z, d.x, d.y, d.z, 22, (id) => id !== 0);
+  if (!h || game.world.getBlock(h.x, h.y, h.z) !== B.WATER) { void lp; toast('Cast your line into water'); sfx.cast(); swing(); return; }
+  hx = h.x + 0.5; hz = h.z + 0.5; hy = h.y; while (game.world.getBlock(h.x, hy + 1, h.z) === B.WATER) hy++;
+  const mesh = new THREE.Group(); const red = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.12, 0.16), new THREE.MeshBasicMaterial({ color: 0xd02020 })); const wh = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.08, 0.16), new THREE.MeshBasicMaterial({ color: 0xf0f0f0 })); wh.position.y = 0.1; mesh.add(red, wh); scene.add(mesh);
+  const line = new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]), new THREE.LineBasicMaterial({ color: 0x222222 })); scene.add(line);
+  const lure = enchLevel(game.inv.held(), 'lure');
+  bobber = { x: hx, y: hy + 0.9, z: hz, mesh, line, wait: Math.max(1.5, 4 + Math.random() * 14 - lure * 4), bite: 0, t: 0 };
+  sfx.cast(); swing(); ents.burst(hx, hy + 1, hz, [0.6, 0.75, 1], 8, 1.5, 0.06);
+}
+function updateBobber(dt) {
+  if (!bobber) return; const b = bobber; b.t += dt;
+  const h = game.inv.held(); if (!h || h.id !== I.FISHING_ROD || Math.hypot(b.x - player.x, b.z - player.z) > 30 || game.dim !== b.dim && b.dim) { removeBobber(); return; }
+  b.dim = game.dim;
+  if (b.bite > 0) { b.bite -= dt; if (b.bite <= 0) { b.wait = 3 + Math.random() * 10; } }
+  else { b.wait -= dt * (game.raining ? 1.3 : 1); if (b.wait <= 0) { b.bite = 1.3; sfx.bite(); ents.burst(b.x, b.y, b.z, [0.7, 0.85, 1], 14, 2.4, 0.07); } }
+  const dip = b.bite > 0 ? -0.25 : Math.sin(b.t * 2.5) * 0.04;
+  b.mesh.position.set(b.x, b.y + dip, b.z);
+  const pos = b.line.geometry.attributes.position; const d = new THREE.Vector3(); camera.getWorldDirection(d);
+  const rx = Math.cos(player.yaw) * 0.35, rz = -Math.sin(player.yaw) * 0.35;
+  pos.setXYZ(0, camera.position.x + d.x * 0.8 + rx, camera.position.y + 0.2 + d.y * 0.8, camera.position.z + d.z * 0.8 + rz); pos.setXYZ(1, b.x, b.y + dip + 0.12, b.z); pos.needsUpdate = true;
+}
+function removeBobber() { if (!bobber) return; scene.remove(bobber.mesh); scene.remove(bobber.line); bobber = null; }
+const FISH_LOOT = { fish: [[I.RAW_COD, 1]], junk: [[I.STRING, 1], [I.BONE, 1], [I.LEATHER, 1], [I.STICK, 1], [I.BOWL || I.STICK, 1]], treasure: [[I.EMERALD, 2], [I.DIAMOND, 1], [I.BOW, 1], [I.FISHING_ROD, 1], [I.ENDER_PEARL, 1], [I.SLIME_BALL, 2]] };
+function reelIn() {
+  const b = bobber; const h = game.inv.held(); sfx.reel(); swing();
+  if (b.bite > 0) {
+    const luck = enchLevel(h, 'luck_of_the_sea'); const r = Math.random();
+    const kind = r < 0.05 + luck * 0.025 ? 'treasure' : r < 0.15 - luck * 0.02 ? 'junk' : 'fish';
+    const pool = FISH_LOOT[kind]; const [id, n] = pool[Math.floor(Math.random() * pool.length)];
+    let ench; if (kind === 'treasure' && (id === I.BOW || id === I.FISHING_ROD)) ench = rollEnchants(id, 25, Math.random) || undefined;
+    const left = game.inv.add(id, n, maxDur(id) || undefined, ench); if (left) game.dropFromPlayer(id, left);
+    game.addXP ? game.addXP(1 + Math.floor(Math.random() * 6)) : 0;
+    toast((kind === 'treasure' ? 'Treasure: ' : 'Caught ') + itemName(id) + (n > 1 ? ' x' + n : ''), 2000); sfx.pop();
+    if (game.mode === 'survival') game.inv.damageHeld(1);
+  }
+  removeBobber();
+}
+// ---------- trident ----------
+function throwTrident() {
+  const h = game.inv.held(); const d = new THREE.Vector3(); camera.getWorldDirection(d); const sp = 30;
+  const mesh = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.06, 1.2), new THREE.MeshLambertMaterial({ color: 0x3a9a9a })); scene.add(mesh);
+  ents.arrows.push({ x: camera.position.x + d.x * 0.7, y: camera.position.y + d.y * 0.7 - 0.1, z: camera.position.z + d.z * 0.7, vx: d.x * sp, vy: d.y * sp + 0.5, vz: d.z * sp, life: 3, mesh, dmg: 8 + enchLevel(h, 'sharpness'), fromPlayer: true });
+  const back = { ...h }; game.inv.slots[game.inv.sel] = null; game.inv.onChange(); sfx.bow(); swing();
+  setTimeout(() => { if (game.mode === 'survival') back.dur = (back.dur ?? 250) - 1; if (back.dur > 0 || game.mode !== 'survival') { if (!game.inv.slots[game.inv.sel]) { game.inv.slots[game.inv.sel] = back; game.inv.onChange(); } else game.inv.add(back.id, 1, back.dur, back.ench); sfx.pop(); } }, 1600);
+}
+// ---------- campfires ----------
+const cooking = [];
+function cookOnCampfire(b, held) {
+  const out = SMELT[held.id]; if (!out || !ITEMS[held.id] || !ITEMS[held.id].food) return false;
+  if (cooking.filter((c) => c.x === b.x && c.y === b.y && c.z === b.z).length >= 4) { toast('The campfire is full'); return true; }
+  cooking.push({ x: b.x, y: b.y, z: b.z, out, t: 8 }); if (game.mode === 'survival') game.inv.consumeHeld(1); sfx.place(B.PLANKS); swing(); toast('Cooking ' + itemName(held.id) + '...'); return true;
+}
+let fireFxT = 0;
+function updateCampfires(dt) {
+  for (let i = cooking.length - 1; i >= 0; i--) { const c = cooking[i]; c.t -= dt; if (c.t <= 0) { cooking.splice(i, 1); if (game.world.getBlock(c.x, c.y, c.z) === B.CAMPFIRE) { ents.dropItem(c.out, 1, c.x + 0.5, c.y + 0.8, c.z + 0.5, 0, 2, 0); sfx.pop(); } } }
+  fireFxT -= dt; if (fireFxT > 0) return; fireFxT = 0.12;
+  const w = game.world; const px = Math.floor(player.x), py = Math.floor(player.y), pz = Math.floor(player.z);
+  for (let k = 0; k < 6; k++) { const x = px + Math.floor((Math.random() - 0.5) * 24), y = py + Math.floor((Math.random() - 0.5) * 10), z = pz + Math.floor((Math.random() - 0.5) * 24); if (w.getBlock(x, y, z) === B.CAMPFIRE) { ents.burst(x + 0.5, y + 0.8, z + 0.5, [0.55, 0.55, 0.55], 3, 0.4, 0.14, 2.5); ents.burst(x + 0.5, y + 0.6, z + 0.5, [1, 0.6, 0.15], 2, 0.6, 0.06, 0.4); } }
+}
+// ---------- lightning & thunderstorms ----------
+let boltT = 6, flashT = 0; const bolts = [];
+function strikeLightning(x, z) {
+  const w = game.world; const y = Math.max(w.topSolid(Math.floor(x), Math.floor(z)) + 1, 2);
+  const g = new THREE.Group(); const mat = new THREE.MeshBasicMaterial({ color: 0xe8f0ff, transparent: true, opacity: 0.95 });
+  let cx = x, cz = z; for (let yy = y + 90; yy > y; yy -= 6) { const nx = cx + (Math.random() - 0.5) * 3, nz = cz + (Math.random() - 0.5) * 3; const len = 6; const seg = new THREE.Mesh(new THREE.BoxGeometry(0.25, len, 0.25), mat); seg.position.set((cx + nx) / 2, yy - len / 2, (cz + nz) / 2); seg.rotation.z = Math.atan2(nx - cx, len) * 0.9; seg.rotation.x = -Math.atan2(nz - cz, len) * 0.9; g.add(seg); cx = nx; cz = nz; }
+  scene.add(g); bolts.push({ g, t: 0.35 }); flashT = 0.25;
+  const dist = Math.hypot(x - player.x, z - player.z); setTimeout(() => sfx.thunder(), Math.min(4000, dist / 0.34)); if (dist < 40) sfx.zap();
+  if (Math.hypot(x - player.x, y - player.y, z - player.z) < 3.5 && game.mode === 'survival') { player.hurtCd = 0; game.damagePlayer(5, x, z, 'lightning'); }
+  for (const m of [...ents.mobs]) {
+    if (Math.hypot(m.x - x, m.y - y, m.z - z) > 3.5) continue;
+    if (m.type === 'pig') { ents.remove ? ents.remove(m) : (m.dead = 0.01); ents.spawnMob('zombified_piglin', m.x, m.y, m.z); }
+    else if (m.type === 'creeper') { m.charged = true; m.hp = m.def.hp; }
+    else ents.hurtMob(m, 5, x, z);
+  }
+  ents.burst(x, y + 0.5, z, [1, 1, 1], 20, 4, 0.12);
+}
+function updateWeatherFx(dt) {
+  for (let i = bolts.length - 1; i >= 0; i--) { const b = bolts[i]; b.t -= dt; b.g.visible = b.t > 0.2 || (b.t * 30 | 0) % 2 === 0; if (b.t <= 0) { scene.remove(b.g); bolts.splice(i, 1); } }
+  if (flashT > 0) { flashT -= dt; }
+  $('flash').style.opacity = flashT > 0 ? Math.min(0.55, flashT * 2.4) : 0;
+  if (!game.raining || !game.thunder || game.dim !== 'overworld') return;
+  boltT -= dt; if (boltT > 0) return; boltT = 4 + Math.random() * 12;
+  const a = Math.random() * Math.PI * 2, d = 8 + Math.random() * 70;
+  strikeLightning(player.x + Math.cos(a) * d, player.z + Math.sin(a) * d);
+}
+// ---------- compass & clock ----------
+function heldInfo() {
+  const el = $('held-info'); const h = game.inv.held(); let t = '';
+  if (h && h.id === I.COMPASS) {
+    if (game.dim !== 'overworld') t = 'The compass needle spins wildly';
+    else { const dx = player.spawn.x - player.x, dz = player.spawn.z - player.z, d = Math.hypot(dx, dz); const ang = Math.atan2(-dx, -dz) - player.yaw; const arrows = ['↑', '↖', '←', '↙', '↓', '↘', '→', '↗']; const k = ((Math.round(ang / (Math.PI / 4)) % 8) + 8) % 8; t = d < 3 ? 'You are at your spawn point' : `${arrows[k]}  Spawn ${Math.round(d)} blocks`; }
+  } else if (h && h.id === I.CLOCK) {
+    if (game.dim !== 'overworld') t = 'The clock hands spin wildly';
+    else { const tk = (game.ticks + 6000) % 24000; const hh = Math.floor(tk / 1000), mm = Math.floor((tk % 1000) * 0.06); const tod = game.ticks % 24000; t = `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}  ${tod < 12000 ? 'Day' : tod < 13000 ? 'Sunset' : tod < 23000 ? 'Night' : 'Sunrise'}${game.thunder && game.raining ? ' · Storm' : game.raining ? ' · Rain' : ''}`; }
+  } else if (h && h.id === I.SHIELD && player.sneaking) t = 'Blocking';
+  else if (player.boat) t = 'Joystick to row · jump to leave the boat';
+  el.textContent = t; el.classList.toggle('hidden', !t);
+}
+function shearSheep(m) {
+  if (m.sheared || m.baby) return false;
+  m.sheared = 90; const n = 1 + Math.floor(Math.random() * 3);
+  for (let i = 0; i < n; i++) ents.dropItem(m.woolColor || B.WOOL, 1, m.x, m.y + 1, m.z, (Math.random() - 0.5) * 3, 4, (Math.random() - 0.5) * 3);
+  m.model.g.traverse((o) => { if (o.isMesh && o.material && o.material.color && o.material.color.getHex() === 0xf2f2f2) { o.userData.wool = true; o.material.color.setHex(0xd8c8b8); o.scale.multiplyScalar(0.86); } });
+  sfx.sheep(); swing(); if (game.mode === 'survival') game.inv.damageHeld(1); return true;
+}
+let sheepT = 0;
+function tickSheep(dt) {
+  sheepT -= dt; if (sheepT > 0) return; sheepT = 2;
+  for (const m of ents.mobs) if (m.type === 'sheep' && m.sheared) { m.sheared -= 2; if (m.sheared <= 0) { m.sheared = 0; m.model.g.traverse((o) => { if (o.userData.wool) { o.userData.wool = false; o.material.color.setHex(0xf2f2f2); o.scale.multiplyScalar(1 / 0.86); } }); } }
+}
+
 // ---------- the End ----------
 function setupEnd() {
   const w = game.world; game.endState = game.endState || { dragonDead: false };
@@ -947,7 +1172,8 @@ function tickSpawning(dt) {
       for (let dx = -6; dx <= 6 && !lit; dx += 1) for (let dy = -3; dy <= 3 && !lit; dy++) for (let dz = -6; dz <= 6; dz++) if (EMIT[w.getBlock(x + dx, y + dy, z + dz)]) { lit = true; break; }
       if (lit) continue;
       const r = Math.random(); const type = r < 0.42 ? 'zombie' : r < 0.7 ? 'creeper' : r < 0.93 ? 'skeleton' : 'enderman';
-      ents.spawnMob(type, x + 0.5, y, z + 0.5); break;
+      const typ2 = y < 40 && Math.random() < 0.22 ? 'slime' : type;
+      ents.spawnMob(typ2, x + 0.5, y, z + 0.5); break;
     }
   }
   const passive = ents.mobs.filter((m) => m.def.passive && !m.def.villager).length;
@@ -1090,6 +1316,25 @@ function useAt(sx, sy) {
       if (player.sneaking && !c.ai) { vehicles.remove(c); if (game.mode === 'survival') { const left = game.inv.add(I.CAR, 1); if (left) game.dropFromPlayer(I.CAR, 1); } toast('Picked up the car'); return; }
       enterCar(c); return;
     } }
+  { const bt = rayHitBoat(p.o, p.d, 5);
+    if (bt && bt !== player.boat && !p.mob) {
+      swing();
+      if (player.sneaking) { scene.remove(bt.mesh); boats.splice(boats.indexOf(bt), 1); if (game.mode === 'survival') { const left = game.inv.add(I.BOAT, 1); if (left) game.dropFromPlayer(I.BOAT, 1); } toast('Picked up the boat'); return; }
+      player.boat = bt; player.boatT = 0; toast('Joystick to row. Tap jump to leave the boat', 2600); return;
+    } }
+  if (held && isArmor(held.id)) { equipArmor(); return; }
+  if (held && held.id === I.BOAT) {
+    const o = p.o, d = p.d; const h = w.raycast(o.x, o.y, o.z, d.x, d.y, d.z, 6, (id) => id !== 0);
+    if (!h) return; let bx = h.x + 0.5, bz = h.z + 0.5, by;
+    if (w.getBlock(h.x, h.y, h.z) === B.WATER) { let y = h.y; while (w.getBlock(h.x, y + 1, h.z) === B.WATER) y++; by = y + 0.6; }
+    else { bx = h.x + h.nx + 0.5; bz = h.z + h.nz + 0.5; by = h.y + h.ny + (h.ny === 1 ? 0 : 0.01); if (h.ny !== 1) return; }
+    placeBoat(bx, by, bz); sfx.place(B.PLANKS); swing(); if (game.mode === 'survival') game.inv.consumeHeld(1); return;
+  }
+  if (held && held.id === I.FISHING_ROD) { castRod(sx, sy); return; }
+  if (held && held.id === I.TRIDENT && !p.mob) { throwTrident(); return; }
+  if (held && held.id === I.MILK_BUCKET) { sfx.eat(); swing(); player.fireT = 0; player.burnT = 0; if (game.mode === 'survival') { game.inv.slots[game.inv.sel] = { id: I.BUCKET, count: 1 }; game.inv.onChange(); } toast('You drank the milk. All effects cleared'); return; }
+  if (held && held.id === I.SHIELD) { toast('Sneak while holding the shield to block attacks'); return; }
+  if (held && p.block && p.block.id === B.CAMPFIRE && !p.mob && cookOnCampfire(p.block, held)) return;
   if (held && held.id === I.BOW) { shootBow(); return; }
   if (held && held.id === I.ELYTRA) { if (player.elytra) { const o = player.elytra; game.inv.slots[game.inv.sel] = { id: I.ELYTRA, count: 1, dur: o.dur, ench: o.ench }; } else game.inv.slots[game.inv.sel] = null; player.elytra = { dur: held.dur ?? maxDur(I.ELYTRA), ench: held.ench }; game.inv.onChange(); sfx.place(B.WOOL); setElytraBtn(); toast('Elytra equipped. Jump, then tap jump again in mid-air to glide', 3200); return; }
   if (held && held.id === I.FIREWORK) {
@@ -1128,6 +1373,8 @@ function useAt(sx, sy) {
   }
   if (p.mob) {
     const m = p.mob;
+    if (held && held.id === I.SHEARS && m.type === 'sheep') { if (!shearSheep(m)) toast('This sheep has no wool yet'); return; }
+    if (held && held.id === I.BUCKET && m.type === 'cow' && !m.baby) { sfx.splash(); swing(); if (game.mode === 'survival') { if (held.count > 1) { held.count--; const l = game.inv.add(I.MILK_BUCKET, 1); if (l) game.dropFromPlayer(I.MILK_BUCKET, 1); } else game.inv.slots[game.inv.sel] = { id: I.MILK_BUCKET, count: 1 }; game.inv.onChange(); } else game.inv.add(I.MILK_BUCKET, 1); toast('Milk bucket'); return; }
     if (held && held.id === I.BONE && m.type === 'wolf' && !m.owner && !m.dead) {
       if (game.mode === 'survival') game.inv.consumeHeld(1); swing();
       if (Math.random() < 0.34) { m.owner = true; m.angry = 0; m.hp = m.maxHp = 20; if (m.model.g.userData.collar) m.model.g.userData.collar.visible = true; ents.hearts(m.x, m.y + m.h, m.z, 8); sfx.heart(); toast('Wolf tamed. It will follow you and fight for you'); }
@@ -1238,7 +1485,12 @@ function useAt(sx, sy) {
     if (tx + 1 > player.x - pw + e && tx < player.x + pw - e && tz + 1 > player.z - pw + e && tz < player.z + pw - e && ty + 1 > player.y + e && ty < player.y + player.h - e) return;
     for (const m of ents.mobs) if (tx + 1 > m.x - m.w && tx < m.x + m.w && tz + 1 > m.z - m.w && tz < m.z + m.w && ty + 1 > m.y && ty < m.y + m.h) return;
   }
-  const meta = pb.tiles && pb.tiles.front !== pb.tiles.side ? facingMeta() : 0;
+  let meta = pb.tiles && pb.tiles.front !== pb.tiles.side ? facingMeta() : 0;
+  if (placeId === B.LADDER) {
+    if (b.ny === 0) meta = b.nz === -1 ? 0 : b.nz === 1 ? 1 : b.nx === -1 ? 2 : 3;
+    else { meta = { 3: 2, 1: 3, 2: 0, 0: 1 }[facingMeta()]; }
+    const wall = [[0, 1], [0, -1], [1, 0], [-1, 0]][meta]; if (!SOLID[w.getBlock(tx + wall[0], ty, tz + wall[1])]) { toast('Ladders need a wall behind them'); return; }
+  }
   game.setBlock(tx, ty, tz, placeId, meta);
   if (placeId === B.SUGAR_CANE) w.crops.set(tkey(tx, ty, tz), [tx, ty, tz]);
   sfx.place(placeId); swing(); game.stats.placed++;
@@ -1276,10 +1528,10 @@ function runCommand(v) {
   if (!v.startsWith('/')) { chatLog('<Steve> ' + v); return; }
   const [cmd, ...a] = v.slice(1).split(/\s+/);
   const c = cmd.toLowerCase();
-  if (c === 'help') chatLog('Commands: /gamemode s|c, /time set day|night|noon|midnight, /weather clear|rain, /give <item> [n], /tp x y z, /summon pig|cow|sheep|chicken|wolf|cat|villager|iron_golem|zombie|creeper|skeleton|enderman|zombified_piglin|ghast|blaze|magma_cube|ender_dragon|tnt, /locate village|town|city|windfarm|stronghold|fortress|end_city, /car [bus|police|taxi], /phone, /dim nether|end|overworld, /enchant <name> [level], /difficulty 0-3, /kill, /seed, /spawnpoint, /heal');
+  if (c === 'help') chatLog('Commands: /gamemode s|c, /time set day|night|noon|midnight, /weather clear|rain|thunder, /give <item> [n], /tp x y z, /summon pig|cow|sheep|chicken|wolf|cat|villager|iron_golem|zombie|creeper|skeleton|enderman|slime|zombified_piglin|ghast|blaze|magma_cube|ender_dragon|tnt, /locate village|town|city|windfarm|stronghold|fortress|end_city, /car [bus|police|taxi], /phone, /dim nether|end|overworld, /enchant <name> [level], /difficulty 0-3, /kill, /seed, /spawnpoint, /heal');
   else if (c === 'gamemode' || c === 'gm') { const m = (a[0] || '').toLowerCase(); setMode(m.startsWith('c') || m === '1' ? 'creative' : 'survival'); chatLog('Game mode set to ' + game.mode); }
   else if (c === 'time') { const t = (a[1] || a[0] || '').toLowerCase(); const map = { day: 1000, noon: 6000, sunset: 12000, night: 13500, midnight: 18000, sunrise: 23000 }; const base = Math.floor(game.ticks / 24000) * 24000; const n = map[t] ?? parseInt(t, 10); if (!isNaN(n)) { game.ticks = base + n; chatLog('Set the time to ' + t); } }
-  else if (c === 'weather') { game.raining = (a[0] || '') === 'rain' || (a[0] || '') === 'thunder'; game.rainT = 600; chatLog('Weather: ' + (game.raining ? 'rain' : 'clear')); }
+  else if (c === 'weather') { game.raining = (a[0] || '') === 'rain' || (a[0] || '') === 'thunder'; game.thunder = (a[0] || '') === 'thunder'; game.rainT = 600; boltT = 2; chatLog('Weather: ' + (game.thunder ? 'thunderstorm' : game.raining ? 'rain' : 'clear')); }
   else if (c === 'give') {
     const name = (a[0] || '').toLowerCase(); let id = NAME_TO_ID[name] ?? NAME_TO_ID[name.replace(/^minecraft:/, '')];
     if (id === undefined) id = Object.entries(NAME_TO_ID).find(([k]) => k.includes(name))?.[1];
@@ -1413,6 +1665,7 @@ function updatePlayer(dt) {
   if (!w.isLoaded(Math.floor(p.x), Math.floor(p.z))) return; // wait for terrain
   if (p.riding) { if (!vehicles.list.includes(p.riding)) exitCar(); else { p.yaw = p.riding.yaw + Math.PI; p.sneaking = p.sprinting = false; p.inWater = p.inLava = p.headInWater = p.headInLava = false; return; } }
   const inputBlocked = ui.screen || game.chatOpen || game.inBed;
+  if (p.boat) { updateBoatRide(dt, inputBlocked); return; }
   // input vector
   let mx = 0, mz = 0;
   if (!inputBlocked) {
@@ -1429,13 +1682,22 @@ function updatePlayer(dt) {
   const mid = w.getBlock(Math.floor(p.x), Math.floor(p.y + 0.9), Math.floor(p.z));
   const head = w.getBlock(Math.floor(p.x), Math.floor(p.y + 1.62), Math.floor(p.z));
   p.inWater = feet === B.WATER || mid === B.WATER; p.inLava = feet === B.LAVA || mid === B.LAVA; p.headInWater = head === B.WATER; p.headInLava = head === B.LAVA;
+  const below = w.getBlock(Math.floor(p.x), Math.floor(p.y - 0.06), Math.floor(p.z));
+  const inWeb = !p.flying && collidesId(w, p, B.COBWEB);
+  const onLadder = !p.flying && !p.gliding && collidesId(w, p, B.LADDER);
+  const icy = p.onGround && (below === B.ICE || below === B.PACKED_ICE);
   // speeds
   let speed = p.flying ? (p.sprinting ? 21 : 10.9) : p.sneaking ? 1.3 : p.sprinting ? 5.6 : 4.317;
-  if ((p.inWater || p.inLava) && !p.flying) speed *= p.inLava ? 0.35 : 0.55;
+  const ds = armorEnch(3, 'depth_strider');
+  if ((p.inWater || p.inLava) && !p.flying) speed *= p.inLava ? 0.35 : 0.55 + ds * 0.15;
+  if (p.onGround && !p.flying && below === B.SOUL_SAND) speed *= 0.45;
+  if (p.onGround && !p.flying && below === B.SLIME) speed *= 0.7;
+  if (icy) speed *= 1.15;
+  if (inWeb) speed *= 0.15;
   if (eatT > 0) speed *= 0.4;
   const sy = Math.sin(p.yaw), cy = Math.cos(p.yaw);
   const tx = (mx * cy + mz * sy) * speed, tz = (-mx * sy + mz * cy) * speed;
-  const accel = p.onGround || p.flying ? 12 : (p.inWater ? 6 : 3);
+  const accel = icy ? 1.4 : p.onGround || p.flying ? 12 : (p.inWater ? 6 : 3);
   p.vx += (tx - p.vx) * Math.min(1, dt * accel); p.vz += (tz - p.vz) * Math.min(1, dt * accel);
   if (p.flying) {
     const up = (jump ? 1 : 0) - ((keys.shift || keys.flyDown) ? 1 : 0);
@@ -1445,6 +1707,13 @@ function updatePlayer(dt) {
     if (jump) p.vy = Math.min(p.vy + 30 * dt, 3.6);
     p.vy = Math.max(p.vy, -3);
     if (p.fallStart !== null) p.fallStart = null;
+    // flowing water pushes you along
+    const fl = waterFlow(w, Math.floor(p.x), Math.floor(p.y + 0.1), Math.floor(p.z));
+    if (fl) { p.vx += fl[0] * 9 * dt; p.vz += fl[1] * 9 * dt; if (fl[2]) p.vy -= 6 * dt; }
+  } else if (onLadder) {
+    p.vy -= 28 * dt;
+    if (jump || (p._hitH && ml > 0.2)) p.vy = 3.2; else if (p.sneaking) p.vy = 0; else p.vy = Math.max(p.vy, -2.4);
+    p.fallStart = null;
   } else if (p.gliding) {
     const cp = Math.cos(p.pitch); const lx = -Math.sin(p.yaw) * cp, lz = -Math.cos(p.yaw) * cp, ly = Math.sin(p.pitch);
     let gs = p.glideSpeed; gs += (-ly * 16 - gs * 0.08) * dt; if (p.boostT > 0) { p.boostT -= dt; gs += (30 - gs) * Math.min(1, dt * 3); if (Math.random() < dt * 30) ents.burst(p.x, p.y + 0.4, p.z, [1, 0.8, 0.5], 1, 0.4, 0.08, 0.4); }
@@ -1459,7 +1728,8 @@ function updatePlayer(dt) {
   } else {
     p.vy -= 28 * dt; p.vy = Math.max(p.vy, -60);
     if (jump && !p._jumpPrev && !p.onGround && p.elytra && (p.elytra.dur ?? 2) > 1 && p.vy < 4 && !p.riding) { p.gliding = true; p.glideT = 0; p.glideSpeed = Math.max(6, Math.hypot(p.vx, p.vz, p.vy)); sfx.ender && sfx.place(B.WOOL); }
-    if (jump && p.onGround) { p.vy = 8.4; p.exh += p.sprinting ? 0.2 : 0.05; if (p.sprinting) { p.vx += -sy * 2; p.vz += -cy * 2; } }
+    if (inWeb) { p.vy = Math.max(-1, Math.min(p.vy, 1)); p.fallStart = null; }
+    if (jump && p.onGround) { p.vy = (below === B.HAY || below === B.SOUL_SAND) ? 7.6 : 8.4; p.exh += p.sprinting ? 0.2 : 0.05; if (p.sprinting) { p.vx += -sy * 2; p.vz += -cy * 2; } }
   }
   // sneak edge guard
   let dx = p.vx * dt, dz = p.vz * dt;
@@ -1469,7 +1739,14 @@ function updatePlayer(dt) {
     if (!ground(p.x + dx, p.z + dz)) { dz = 0; p.vz = 0; }
   }
   const wasGround = p.onGround; const vyBefore = p.vy; const oy = p.y;
+  p.stepH = p.sneaking ? 0.6 : 0.6;
   const hit = moveEntity(w, p, dx, p.vy * dt, dz);
+  p._hitH = hit.hitX || hit.hitZ;
+  // slime blocks bounce you back up
+  const landOn = w.getBlock(Math.floor(p.x), Math.floor(p.y - 0.06), Math.floor(p.z));
+  if (p.onGround && !wasGround && landOn === B.SLIME && vyBefore < -3 && !p.sneaking) { p.vy = -vyBefore * 0.82; p.onGround = false; p.fallStart = p.y; sfx.bounce(); }
+  // campfires and magma burn your feet
+  if (p.onGround && (landOn === B.CAMPFIRE || landOn === B.MAGMA) && !p.sneaking && game.mode === 'survival' && p.hurtCd <= 0) game.damagePlayer(1, undefined, undefined, 'fire');
   // auto-jump
   if ((hit.hitX || hit.hitZ) && p.onGround && (settings.autojump || p.inWater) && ml > 0.2 && !p.sneaking) {
     const fx = Math.floor(p.x + Math.sign(p.vx || tx) * 0.6), fz = Math.floor(p.z + Math.sign(p.vz || tz) * 0.6);
@@ -1485,7 +1762,7 @@ function updatePlayer(dt) {
   // fall damage
   if (!p.onGround && !p.flying && !p.inWater) { if (p.fallStart === null || p.y > p.fallStart) p.fallStart = Math.max(p.fallStart ?? p.y, p.y); }
   if (p.onGround && !wasGround) {
-    if (p.fallStart !== null && game.mode === 'survival') { const fd = p.fallStart - p.y; if (fd > 3.4) { p.hurtCd = 0; game.damagePlayer(Math.floor(fd - 3), undefined, undefined, 'fall'); } }
+    if (p.fallStart !== null && game.mode === 'survival' && landOn !== B.SLIME && !inWeb) { const fd = p.fallStart - p.y; if (fd > 3.4) { let fdm = Math.floor(fd - 3); if (landOn === B.HAY) fdm = Math.floor(fdm * 0.2); else if (landOn === B.WOOL || landOn === B.BED) fdm = Math.floor(fdm * 0.5); if (fdm > 0) { p.hurtCd = 0; game.damagePlayer(fdm, undefined, undefined, 'fall'); } } }
     p.fallStart = null; if (vyBefore < -6) sfx.step(w.getBlock(Math.floor(p.x), Math.floor(p.y - 0.5), Math.floor(p.z)));
   }
   if (p.flying && p.onGround && game.mode === 'creative' && vyBefore < -0.5) { p.flying = false; }
@@ -1523,7 +1800,7 @@ function updatePlayer(dt) {
     // cactus
     if (collidesId(w, p, B.CACTUS)) { if (p.hurtCd <= 0) game.damagePlayer(1, undefined, undefined, 'cactus'); }
     // air
-    if (p.headInWater) { p.air -= dt * 20; if (p.air <= 0) { p.air = 0; p.drownT = (p.drownT || 0) - dt; if (p.drownT <= 0) { p.drownT = 1; p.hurtCd = 0; game.damagePlayer(2, undefined, undefined, 'drown'); } } }
+    if (p.headInWater) { p.air -= dt * 20 / (1 + armorEnch(0, 'respiration')); if (p.air <= 0) { p.air = 0; p.drownT = (p.drownT || 0) - dt; if (p.drownT <= 0) { p.drownT = 1; p.hurtCd = 0; game.damagePlayer(2, undefined, undefined, 'drown'); } } }
     else p.air = Math.min(300, p.air + dt * 100);
     // hunger
     if (p.exh >= 4) { p.exh -= 4; if (p.sat > 0) p.sat = Math.max(0, p.sat - 1); else if (game.difficulty > 0) p.food = Math.max(0, p.food - 1); }
@@ -1578,7 +1855,7 @@ function updateSky(dt, camPos) {
   const dayTime = ((game.ticks % 24000) + 24000) % 24000;
   const ang = dayTime / 24000 * Math.PI * 2; const sunH = Math.sin(ang);
   const t = THREE.MathUtils.smoothstep(sunH, -0.22, 0.25);
-  let dl = 0.16 + 0.84 * t; if (game.raining) dl *= 0.72;
+  let dl = 0.16 + 0.84 * t; if (game.raining) dl *= game.thunder ? 0.5 : 0.72; if (flashT > 0) dl = Math.min(1, dl + flashT * 2);
   game.daylight = dl; uniforms.daylight.value = dl;
   const sky = tmpC.copy(skyNight).lerp(game.raining ? rainSky : skyDay, t);
   const fog = new THREE.Color().copy(skyNight).lerp(game.raining ? rainSky : fogDay, t);
@@ -1704,15 +1981,16 @@ function update(dt) {
     engineT -= dt; if (engineT < 0) { engineT = 0.11; sfx.engine(Math.abs(c.speed)); }
     if (player.dead) exitCar();
   }
+  updateBoats(dt); updateBobber(dt); updateCampfires(dt); updateWeatherFx(dt); tickSheep(dt);
   tickSpawning(dt); updateEyes(dt); bowCd = Math.max(0, bowCd - dt); tickEndermanStare(dt); updateBossBar();
   fluidT += dt; if (fluidT > 0.25) { fluidT = 0; tickFluids(game.fluidQ, B.WATER, 7); }
   lavaT += dt; if (lavaT > 0.9) { lavaT = 0; tickFluids(game.lavaQ, B.LAVA, 3); }
   tickFurnaces(dt);
   tickCrops(dt);
   tickSettlements(dt);
-  game.rainT -= dt; if (game.rainT < 0) { game.raining = !game.raining; game.rainT = game.raining ? 300 + Math.random() * 400 : 900 + Math.random() * 1500; }
+  game.rainT -= dt; if (game.rainT < 0) { game.raining = !game.raining; game.thunder = game.raining && Math.random() < 0.35; game.rainT = game.raining ? 300 + Math.random() * 400 : 900 + Math.random() * 1500; if (game.thunder) toast('A thunderstorm is rolling in'); }
   ui.renderStats(player, game.mode);
-  coordsT -= dt; if (coordsT < 0) { coordsT = 0.25; $('coords').textContent = `XYZ: ${Math.floor(player.x)} / ${Math.floor(player.y)} / ${Math.floor(player.z)}`; }
+  coordsT -= dt; if (coordsT < 0) { coordsT = 0.25; heldInfo(); $('coords').textContent = `XYZ: ${Math.floor(player.x)} / ${Math.floor(player.y)} / ${Math.floor(player.z)}`; }
 }
 function render(dt) {
   const p = player;
@@ -1725,7 +2003,8 @@ function render(dt) {
   } else if (game.droneView && game.state === 'playing') {
     const fx = -Math.sin(p.yaw), fz = -Math.cos(p.yaw); camera.position.set(p.x - fx * 16, Math.min(H + 20, p.y + 28), p.z - fz * 16); camera.lookAt(p.x + fx * 10, p.y, p.z + fz * 10);
   } else {
-    camera.position.set(p.x, p.y + eye + Math.abs(bob) * 0.8, p.z);
+    p.stepY = (p.stepY || 0) * Math.exp(-dt * 16); if (p.stepY < 0.005) p.stepY = 0;
+    camera.position.set(p.x, p.y + eye + Math.abs(bob) * 0.8 - p.stepY, p.z);
     camera.rotation.y = p.yaw; camera.rotation.x = p.pitch; camera.rotation.z = bob * 0.12;
   }
   if (shake > 0) { shake -= dt; camera.position.x += (Math.random() - 0.5) * shake * 0.4; camera.position.y += (Math.random() - 0.5) * shake * 0.4; }
@@ -1761,7 +2040,7 @@ window.render_game_to_text = () => JSON.stringify({
   mobs: ents ? ents.mobs.slice(0, 12).map((m) => ({ type: m.type, x: +m.x.toFixed(1), y: +m.y.toFixed(1), z: +m.z.toFixed(1), hp: m.hp })) : [],
   items: ents ? ents.items.length : 0, chunks: game.chunkMeshes.size, breaking: look ? { breaking: look.breaking, prog: +(look.prog || 0).toFixed(2) } : null,
 });
-window.__dbg = { vehicles, tech, enterCar, exitCar, player, game, pick, useAt, breakBlock, ui, runCommand, keys, settings, switchDim, tryLightPortal, countShelves, checkEndPortal, get ents() { return ents; } };
+window.__dbg = { vehicles, tech, enterCar, exitCar, player, game, pick, useAt, breakBlock, ui, runCommand, keys, settings, switchDim, tryLightPortal, countShelves, checkEndPortal, get ents() { return ents; }, get bobber() { return bobber; }, get boats() { return boats; } };
 
 // ---------- boot ----------
 hurtFlash = document.createElement('div'); hurtFlash.id = 'hurt-flash'; document.body.appendChild(hurtFlash);

@@ -286,3 +286,7 @@ body:has(#pause:not(.hidden)) #hud, body:has(#settings:not(.hidden)) #hud, body:
 #bossbar-name { color: #fff; font-size: 12px; text-shadow: 1px 1px 0 #000; margin-bottom: 3px; }
 #bossbar .bb-track { height: 8px; background: rgba(0,0,0,0.6); border: 1px solid rgba(255,255,255,0.5); }
 #bossbar-fill { height: 100%; width: 100%; background: linear-gradient(#e070ff, #a020c8); }
+#armorbar { grid-column: 1; grid-row: 1; }
+.armor-col { margin-bottom: 4px; }
+#held-info { position: absolute; top: calc(50% + 34px); left: 50%; transform: translateX(-50%); color: #fff; font-size: 13px; text-shadow: 1px 1px 0 #000; background: rgba(0,0,0,0.35); padding: 3px 10px; pointer-events: none; white-space: nowrap; z-index: 4; }
+#flash { position: fixed; inset: 0; background: #eef2ff; opacity: 0; pointer-events: none; z-index: 3; transition: opacity 0.05s; }

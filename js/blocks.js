@@ -19,6 +19,7 @@ export const B = {
   HOSPITAL_SIGN: 193, ROAD_LINE: 194, GREEN_CONCRETE: 195, ORANGE_CONCRETE: 196, PLANTER: 197,
   END_STONE: 97, END_FRAME: 98, END_PORTAL: 99, END_FRAME_EYE: 198, PURPUR: 199, PURPUR_PILLAR: 200, END_BRICKS: 201,
   END_ROD: 202, CHORUS_PLANT: 203, CHORUS_FLOWER: 204, DRAGON_EGG: 205, CRACKED_BRICKS: 206, MOSSY_BRICKS: 207, IRON_BARS: 208,
+  SLIME: 209, LADDER: 210, COBWEB: 211, PACKED_ICE: 212, CAMPFIRE: 213,
 };
 export const I = {
   STICK: 100, COAL: 101, IRON_INGOT: 102, GOLD_INGOT: 103, DIAMOND: 104, REDSTONE: 105, APPLE: 106,
@@ -29,6 +30,7 @@ export const I = {
   GHAST_TEAR: 158, MAGMA_CREAM: 159, NETHER_BRICK: 160,
   SMARTPHONE: 300, CAR: 301, CIRCUIT: 302, BATTERY: 303, DRONE: 304,
   EYE_OF_ENDER: 305, ENDER_PEARL: 306, ELYTRA: 307, FIREWORK: 308, BOW: 309, RAW_CHICKEN: 310, COOKED_CHICKEN: 311, EGG: 312, FEATHER: 313, CHORUS_FRUIT: 314, STRING: 315,
+  COMPASS: 340, CLOCK: 341, BOAT: 342, SHEARS: 343, MILK_BUCKET: 344, FISHING_ROD: 345, RAW_COD: 346, COOKED_COD: 347, SLIME_BALL: 348, SHIELD: 349, TRIDENT: 350,
 };
 // tools: 130 + mat*4 + type
 export const TOOL_MATS = ['wooden', 'stone', 'iron', 'golden', 'diamond'];
@@ -189,6 +191,11 @@ def(205, { name: 'Dragon Egg', tex: 'dragon_egg', light: 1, hardness: 3, gravity
 def(206, { name: 'Cracked Stone Bricks', tex: 'cracked_bricks', hardness: 1.5, tool: 'pickaxe', tier: 1 });
 def(207, { name: 'Mossy Stone Bricks', tex: 'mossy_bricks', hardness: 1.5, tool: 'pickaxe', tier: 1 });
 def(208, { name: 'Iron Bars', tex: 'iron_bars', opaque: false, cutout: true, filter: 0, hardness: 5, tool: 'pickaxe', tier: 1, cullSame: true });
+def(209, { name: 'Slime Block', tex: 'slime', opaque: false, filter: 0, translucent: true, hardness: 0 });
+def(210, { name: 'Ladder', tex: 'ladder', solid: false, opaque: false, cutout: true, filter: 0, shape: 'ladder', hardness: 0.4, tool: 'axe' });
+def(211, { name: 'Cobweb', tex: 'cobweb', solid: false, opaque: false, cutout: true, filter: 0, shape: 'cross', hardness: 4, tool: 'sword', drop: I.STRING });
+def(212, { name: 'Packed Ice', tex: 'packed_ice', hardness: 0.5, tool: 'pickaxe' });
+def(213, { name: 'Campfire', tex: { top: 'campfire_top', bottom: 'oak_log_top', side: 'campfire_side' }, opaque: false, filter: 0, shape: 'slab', light: 15, hardness: 2, tool: 'axe', drop: I.COAL });
 def(197, { name: 'Planter', tex: { top: 'grass_top', bottom: 'concrete_gray', side: 'planter_side' }, hardness: 1.5, ...pk });
 
 export const ITEMS = {};
@@ -209,6 +216,27 @@ it(I.SMARTPHONE, 'Smartphone', { stack: 1 }); it(I.CAR, 'Electric Car', { stack:
 it(I.EYE_OF_ENDER, 'Eye of Ender'); it(I.ENDER_PEARL, 'Ender Pearl', { stack: 16 }); it(I.ELYTRA, 'Elytra', { stack: 1, dur: 432 });
 it(I.FIREWORK, 'Firework Rocket'); it(I.BOW, 'Bow', { stack: 1, dur: 384 }); it(I.RAW_CHICKEN, 'Raw Chicken', { food: 2 }); it(I.COOKED_CHICKEN, 'Cooked Chicken', { food: 6 });
 it(I.EGG, 'Egg', { stack: 16 }); it(I.FEATHER, 'Feather'); it(I.CHORUS_FRUIT, 'Chorus Fruit', { food: 4 }); it(I.STRING, 'String');
+it(I.COMPASS, 'Compass', { stack: 1 }); it(I.CLOCK, 'Clock', { stack: 1 }); it(I.BOAT, 'Oak Boat', { stack: 1 }); it(I.SHEARS, 'Shears', { stack: 1, dur: 238 });
+it(I.MILK_BUCKET, 'Milk Bucket', { stack: 1 }); it(I.FISHING_ROD, 'Fishing Rod', { stack: 1, dur: 64 }); it(I.RAW_COD, 'Raw Cod', { food: 2 }); it(I.COOKED_COD, 'Cooked Cod', { food: 5 });
+it(I.SLIME_BALL, 'Slimeball'); it(I.SHIELD, 'Shield', { stack: 1, dur: 336 }); it(I.TRIDENT, 'Trident', { stack: 1, dur: 250 });
+// armor: 320 + mat*4 + piece
+export const ARMOR_MATS = ['leather', 'iron', 'golden', 'diamond', 'netherite'];
+export const ARMOR_PIECES = ['helmet', 'chestplate', 'leggings', 'boots'];
+export const ARMOR_INFO = [
+  { def: [1, 3, 2, 1], mult: 5, tough: 0, color: '#9a5a30', dark: '#6a3a18' },
+  { def: [2, 6, 5, 2], mult: 15, tough: 0, color: '#e0e0e0', dark: '#9a9a9a' },
+  { def: [2, 5, 3, 1], mult: 7, tough: 0, color: '#f8d848', dark: '#c09020' },
+  { def: [3, 8, 6, 3], mult: 33, tough: 2, color: '#6ff2e8', dark: '#2bb8b0' },
+  { def: [3, 8, 6, 3], mult: 37, tough: 3, color: '#4a4248', dark: '#2a2228' },
+];
+const ARMOR_BASE_DUR = [11, 16, 15, 13];
+export const armorId = (m, p) => 320 + m * 4 + p;
+export const isArmor = (id) => id >= 320 && id < 340;
+export const armorInfo = (id) => { const m = Math.floor((id - 320) / 4), p = (id - 320) % 4; return { mat: m, piece: p, def: ARMOR_INFO[m].def[p], tough: ARMOR_INFO[m].tough, color: ARMOR_INFO[m].color, dark: ARMOR_INFO[m].dark }; };
+for (let m = 0; m < 5; m++) for (let p = 0; p < 4; p++) {
+  const n = ARMOR_MATS[m][0].toUpperCase() + ARMOR_MATS[m].slice(1) + ' ' + ARMOR_PIECES[p][0].toUpperCase() + ARMOR_PIECES[p].slice(1);
+  it(armorId(m, p), n, { stack: 1, dur: ARMOR_BASE_DUR[p] * ARMOR_INFO[m].mult, armor: true });
+}
 it(I.BUCKET, 'Bucket', { stack: 16 }); it(I.WATER_BUCKET, 'Water Bucket', { stack: 1 }); it(I.LAVA_BUCKET, 'Lava Bucket', { stack: 1 });
 for (let m = 0; m < 5; m++) for (let t = 0; t < 4; t++) {
   const n = TOOL_MATS[m][0].toUpperCase() + TOOL_MATS[m].slice(1) + ' ' + TOOL_TYPES[t][0].toUpperCase() + TOOL_TYPES[t].slice(1);
@@ -227,6 +255,8 @@ export const CREATIVE_LIST = [
   97, 201, 199, 200, 202, 203, 204, 205, 98, 30, 206, 207, 208, 170, 171, 172, 173, 174, 175, 176, 195, 196, 177, 194, 197, 178, 179, 180, 181, 182, 183, 184, 185, 186, 187, 188, 189, 190, 191, 192, 193,
   I.SMARTPHONE, I.CAR, I.DRONE, I.CIRCUIT, I.BATTERY,
   I.EYE_OF_ENDER, I.ENDER_PEARL, I.ELYTRA, I.FIREWORK, I.BOW, I.ARROW, I.STRING, I.FEATHER, I.EGG, I.RAW_CHICKEN, I.COOKED_CHICKEN, I.CHORUS_FRUIT,
+  210, 209, 211, 212, 213, I.COMPASS, I.CLOCK, I.BOAT, I.SHEARS, I.FISHING_ROD, I.RAW_COD, I.COOKED_COD, I.SLIME_BALL, I.SHIELD, I.MILK_BUCKET,
+  ...[0, 1, 2, 3, 4].flatMap((m) => [0, 1, 2, 3].map((p) => armorId(m, p))),
   I.STICK, I.COAL, I.EMERALD, I.LAPIS, I.BOOK, I.PAPER, I.LEATHER, I.QUARTZ, I.GOLD_NUGGET, I.BLAZE_ROD, I.BLAZE_POWDER, I.GHAST_TEAR, I.MAGMA_CREAM, I.NETHER_BRICK, I.SEEDS, I.WHEAT, I.HOE, I.IRON_INGOT, I.GOLD_INGOT, I.DIAMOND, I.REDSTONE, I.FLINT, I.FLINT_STEEL, I.BUCKET, I.WATER_BUCKET, I.LAVA_BUCKET, I.GUNPOWDER, I.BONE,
   I.APPLE, I.BREAD, I.RAW_PORK, I.COOKED_PORK, I.RAW_BEEF, I.STEAK, I.RAW_MUTTON, I.COOKED_MUTTON, I.ROTTEN_FLESH,
   ...[0, 1, 2, 3, 4].flatMap((m) => [0, 1, 2, 3].map((t) => toolId(m, t))),
@@ -257,6 +287,20 @@ shaped(['WWW', 'PPP'], { W: 35, P: 10 }, 37);
 shaped(['PPP', 'BBB', 'PPP'], { P: 10, B: I.BOOK }, 41);
 shaped(['SSS'], { S: 92 }, I.PAPER, 3);
 shapeless([I.PAPER, I.PAPER, I.PAPER, I.LEATHER], I.BOOK);
+shaped(['S S', 'SSS', 'S S'], { S: I.STICK }, 210, 3);
+shaped(['SSS', 'SSS', 'SSS'], { S: I.SLIME_BALL }, 209); shapeless([209], I.SLIME_BALL, 9);
+shaped(['SS', 'SS'], { S: 19 }, 212);
+shaped([' S ', 'SCS', 'LLL'], { S: I.STICK, C: I.COAL, L: 8 }, 213);
+shaped([' I ', 'IRI', ' I '], { I: I.IRON_INGOT, R: I.REDSTONE }, I.COMPASS);
+shaped([' G ', 'GRG', ' G '], { G: I.GOLD_INGOT, R: I.REDSTONE }, I.CLOCK);
+shaped(['P P', 'PPP'], { P: 10 }, I.BOAT);
+shaped([' I', 'I '], { I: I.IRON_INGOT }, I.SHEARS);
+shaped(['  S', ' ST', 'S T'], { S: I.STICK, T: I.STRING }, I.FISHING_ROD);
+shaped(['PIP', 'PPP', ' P '], { P: 10, I: I.IRON_INGOT }, I.SHIELD);
+for (const [m, mat] of [[0, I.LEATHER], [1, I.IRON_INGOT], [2, I.GOLD_INGOT], [3, I.DIAMOND]]) {
+  shaped(['XXX', 'X X'], { X: mat }, armorId(m, 0)); shaped(['X X', 'XXX', 'XXX'], { X: mat }, armorId(m, 1));
+  shaped(['XXX', 'X X', 'X X'], { X: mat }, armorId(m, 2)); shaped(['X X', 'X X'], { X: mat }, armorId(m, 3));
+}
 shaped([' B ', 'DOD', 'OOO'], { B: I.BOOK, D: I.DIAMOND, O: 40 }, 77);
 shaped(['III', 'III', 'III'], { I: I.LAPIS }, 94); shapeless([94], I.LAPIS, 9);
 shaped(['III', 'III', 'III'], { I: I.GOLD_NUGGET }, I.GOLD_INGOT); shapeless([I.GOLD_INGOT], I.GOLD_NUGGET, 9);
@@ -370,6 +414,7 @@ export function matchRecipe(grid, n) {
 }
 
 export const SMELT = {
+  [I.RAW_COD]: I.COOKED_COD,
   14: I.IRON_INGOT, 15: I.GOLD_INGOT, 6: 12, 4: 3, 73: I.EMERALD, 3: 70, [I.RAW_PORK]: I.COOKED_PORK, [I.RAW_BEEF]: I.STEAK,
   [I.RAW_MUTTON]: I.COOKED_MUTTON, [I.RAW_CHICKEN]: I.COOKED_CHICKEN, [I.CHORUS_FRUIT]: 199, 42: 29, 78: I.NETHER_BRICK, 80: I.QUARTZ, 84: I.GOLD_INGOT, 93: I.LAPIS, 8: I.COAL, 21: I.COAL, 23: I.COAL, 20: 51, 13: I.COAL, 16: I.DIAMOND, 30: 3,
 };
@@ -380,7 +425,7 @@ for (const t of [0, 1, 2, 3]) FUEL[toolId(0, t)] = 1;
 // ---------- Enchantments ----------
 export const ENCH = {
   efficiency: { name: 'Efficiency', max: 5, on: ['pickaxe', 'axe', 'shovel', 'hoe'], w: 10 },
-  unbreaking: { name: 'Unbreaking', max: 3, on: ['pickaxe', 'axe', 'shovel', 'sword', 'hoe', 'flint', 'bow', 'elytra'], w: 5 },
+  unbreaking: { name: 'Unbreaking', max: 3, on: ['pickaxe', 'axe', 'shovel', 'sword', 'hoe', 'flint', 'bow', 'elytra', 'helmet', 'chestplate', 'leggings', 'boots', 'rod', 'shield', 'shears'], w: 5 },
   fortune: { name: 'Fortune', max: 3, on: ['pickaxe', 'axe', 'shovel'], w: 2, excl: 'silk_touch' },
   power: { name: 'Power', max: 5, on: ['bow'], w: 10 },
   infinity: { name: 'Infinity', max: 1, on: ['bow'], w: 1 },
@@ -389,9 +434,16 @@ export const ENCH = {
   knockback: { name: 'Knockback', max: 2, on: ['sword'], w: 5 },
   fire_aspect: { name: 'Fire Aspect', max: 2, on: ['sword'], w: 2 },
   looting: { name: 'Looting', max: 3, on: ['sword'], w: 2 },
+  protection: { name: 'Protection', max: 4, on: ['helmet', 'chestplate', 'leggings', 'boots'], w: 10 },
+  feather_falling: { name: 'Feather Falling', max: 4, on: ['boots'], w: 5 },
+  thorns: { name: 'Thorns', max: 3, on: ['helmet', 'chestplate', 'leggings', 'boots'], w: 1 },
+  respiration: { name: 'Respiration', max: 3, on: ['helmet'], w: 2 },
+  depth_strider: { name: 'Depth Strider', max: 3, on: ['boots'], w: 2 },
+  luck_of_the_sea: { name: 'Luck of the Sea', max: 3, on: ['rod'], w: 2 },
+  lure: { name: 'Lure', max: 3, on: ['rod'], w: 2 },
 };
 export const ROMAN = ['', 'I', 'II', 'III', 'IV', 'V'];
-export const enchKind = (id) => id === I.HOE ? 'hoe' : id === I.BOW ? 'bow' : id === I.ELYTRA ? 'elytra' : id === I.FLINT_STEEL ? 'flint' : isTool(id) ? toolInfo(id).type : null;
+export const enchKind = (id) => isArmor(id) ? ARMOR_PIECES[(id - 320) % 4] : id === I.FISHING_ROD ? 'rod' : id === I.SHIELD ? 'shield' : id === I.SHEARS ? 'shears' : id === I.HOE ? 'hoe' : id === I.BOW ? 'bow' : id === I.ELYTRA ? 'elytra' : id === I.FLINT_STEEL ? 'flint' : isTool(id) ? toolInfo(id).type : null;
 export const enchLevel = (stack, key) => (stack && stack.ench && stack.ench[key]) || 0;
 export const enchText = (ench) => ench ? Object.entries(ench).map(([k, l]) => ENCH[k].name + (ENCH[k].max > 1 ? ' ' + ROMAN[l] : '')).join(', ') : '';
 // roll enchantments for a power level (1..30) using rnd()

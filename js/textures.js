@@ -1,6 +1,6 @@
 // Procedural pixel-art texture atlas + item icons
 import { mulberry32 } from './noise.js';
-import { BLOCKS, I, isTool, toolInfo, isBlock } from './blocks.js';
+import { BLOCKS, I, isTool, toolInfo, isBlock, isArmor, armorInfo } from './blocks.js';
 
 export const TILE = 16, ATLAS_TILES = 32;
 const tiles = {}; // name -> index
@@ -301,6 +301,12 @@ export function buildAtlas() {
   newTile('cracked_bricks', (P) => { for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) { const off = Math.floor(y / 8) % 2 ? 4 : 0; let c = vary([118, 118, 118], 0.12, P.rnd); if (y % 8 === 7 || (x + off) % 8 === 7) c = [78, 78, 78]; P.set(x, y, c); } let x = 3, y = 1; for (let i = 0; i < 18; i++) { P.set(x, y, [50, 50, 50]); y++; x += P.rnd() < 0.5 ? 1 : 0; if (y > 15) break; } });
   newTile('mossy_bricks', (P) => { for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) { const off = Math.floor(y / 8) % 2 ? 4 : 0; let c = vary([122, 122, 122], 0.1, P.rnd); if (y % 8 === 7 || (x + off) % 8 === 7) c = [80, 80, 80]; if (P.rnd() < 0.3 + (y > 10 ? 0.3 : 0)) c = vary([80, 110, 50], 0.2, P.rnd); P.set(x, y, c); } });
   newTile('iron_bars', (P) => { P.clear(); for (let y = 0; y < 16; y++) for (const x of [1, 6, 11]) { P.set(x, y, [150, 154, 160]); P.set(x + 1, y, [100, 104, 110]); } for (const y of [1, 8, 14]) for (let x = 0; x < 16; x++) P.set(x, y, [130, 134, 140]); });
+  newTile('slime', (P) => { for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) { const edge = x === 0 || y === 0 || x === 15 || y === 15; const inner = x >= 3 && x <= 12 && y >= 3 && y <= 12 && (x === 3 || x === 12 || y === 3 || y === 12); P.set(x, y, vary(edge || inner ? [92, 168, 70] : [124, 200, 104], 0.08, P.rnd), 210); } });
+  newTile('ladder', (P) => { P.clear(); for (let y = 0; y < 16; y++) for (const x of [2, 3, 12, 13]) P.set(x, y, vary([140, 104, 60], 0.12, P.rnd)); for (const y of [2, 6, 10, 14]) for (let x = 4; x < 12; x++) { P.set(x, y, vary([164, 124, 74], 0.1, P.rnd)); P.set(x, y + 1, [100, 72, 40]); } });
+  newTile('cobweb', (P) => { P.clear(); const c = [230, 230, 236]; for (let i = 0; i < 16; i++) { P.set(i, i, c, 200); P.set(15 - i, i, c, 200); P.set(7, i, c, 170); P.set(i, 7, c, 170); } for (const r of [3, 6]) for (let a = 0; a < 40; a++) { const t = a / 40 * Math.PI * 2; P.set(Math.round(7.5 + Math.cos(t) * r), Math.round(7.5 + Math.sin(t) * r), c, 160); } });
+  newTile('packed_ice', (P) => { P.noise([142, 178, 232], 0.08); for (let k = 0; k < 10; k++) P.set(Math.floor(P.rnd() * 16), Math.floor(P.rnd() * 16), [190, 214, 250]); });
+  newTile('campfire_top', (P) => { P.noise([60, 44, 28], 0.2); for (let k = 0; k < 40; k++) { const x = 4 + Math.floor(P.rnd() * 8), y = 4 + Math.floor(P.rnd() * 8); P.set(x, y, P.rnd() < 0.5 ? [255, 180, 40] : [255, 110, 20]); } });
+  newTile('campfire_side', (P) => { P.clear(); for (let y = 9; y < 16; y++) for (let x = 0; x < 16; x++) P.set(x, y, vary(y > 12 ? [96, 70, 40] : [76, 56, 32], 0.15, P.rnd)); for (let k = 0; k < 30; k++) { const x = 3 + Math.floor(P.rnd() * 10), y = 2 + Math.floor(P.rnd() * 8); P.set(x, y, P.rnd() < 0.5 ? [255, 200, 60] : [255, 120, 20]); } });
   for (let s = 0; s < 10; s++) newTile('destroy_' + s, (P) => {
     P.clear(); const n = 2 + s * 2;
     for (let k = 0; k < n; k++) { let x = 7 + Math.floor((P.rnd() - 0.5) * (4 + s)), y = 7 + Math.floor((P.rnd() - 0.5) * (4 + s)); const len = 3 + s; for (let i = 0; i < len; i++) { P.set(x, y, [20, 20, 20], 200); x += P.rnd() < 0.5 ? 1 : -1; if (P.rnd() < 0.6) y += P.rnd() < 0.5 ? 1 : -1; } }
@@ -337,7 +343,7 @@ function blockIcon(id) {
   const c = document.createElement('canvas'); c.width = c.height = S; const g = c.getContext('2d'); g.imageSmoothingEnabled = false;
   const t = b.tiles;
   if (b.shape === 'post') { const tc = tileCanvas(nameOfTile(t.side)); for (const x0 of [8, 30]) g.drawImage(tc, 6, 0, 4, 16, x0, 4, 10, 42); for (const y0 of [12, 26]) g.drawImage(tc, 0, 6, 16, 3, 4, y0, 40, 6); return c.toDataURL(); }
-  if (b.shape === 'cross' || b.shape === 'torch') { g.drawImage(tileCanvas(nameOfTile(t.side)), 0, 0, S, S); return c.toDataURL(); }
+  if (b.shape === 'cross' || b.shape === 'torch' || b.shape === 'ladder') { g.drawImage(tileCanvas(nameOfTile(t.side)), 0, 0, S, S); return c.toDataURL(); }
   const top = tileCanvas(nameOfTile(t.top)), left = tileCanvas(nameOfTile(t.front), 0.78), right = tileCanvas(nameOfTile(t.side), 0.6);
   const k = S / 16, pad = 2, s = (S - pad * 2);
   g.setTransform(s / 2 / 16, -s / 4 / 16, s / 2 / 16, s / 4 / 16, pad, pad + s / 4); g.drawImage(top, 0, 0);
@@ -405,6 +411,25 @@ function itemIcon(id) {
   if (id === I.BOW) { drawMap(g, ['..........sss...', '.........s..f...', '........s...f...', '.......s....f...', '......s.....f...', '.....s......f...', '....s.......f...', '...s........f...', '..s........f....', '.s........f.....', '.s.......f......', '.s......f.......', '.s.....f........', '..sssff.........'], { s: '#7a5228', f: '#dddddd' }); return c.toDataURL(); }
   if (id === I.EGG) { g.fillStyle = '#e8dcc0'; g.beginPath(); g.ellipse(9, 10, 5, 6.5, 0, 0, 7); g.fill(); R(6, 7, 2, 2, '#fff8e8'); return c.toDataURL(); }
   if (id === I.FEATHER) { drawMap(g, ['...........ww...', '..........www...', '.........wwww...', '........wwwws...', '.......wwwws....', '......wwwws.....', '.....wwwws......', '....wwwws.......', '....wwws........', '.....ws.........', '....s...........', '...s............'], { w: '#f4f4f4', s: '#bbb' }); return c.toDataURL(); }
+  if (id === I.COMPASS) { g.fillStyle = '#7a7a7a'; g.beginPath(); g.arc(9, 9, 7, 0, 7); g.fill(); g.fillStyle = '#d8d8d0'; g.beginPath(); g.arc(9, 9, 5.5, 0, 7); g.fill(); R(8, 4, 2, 5, '#d02020'); R(8, 9, 2, 5, '#606060'); return c.toDataURL(); }
+  if (id === I.CLOCK) { g.fillStyle = '#c09020'; g.beginPath(); g.arc(9, 9, 7, 0, 7); g.fill(); g.fillStyle = '#5aa0e0'; g.beginPath(); g.arc(9, 9, 5.5, 0, Math.PI, true); g.fill(); g.fillStyle = '#1a2a50'; g.beginPath(); g.arc(9, 9, 5.5, 0, Math.PI); g.fill(); R(8, 4, 2, 5, '#f8f0c0'); return c.toDataURL(); }
+  if (id === I.BOAT) { R(1, 8, 16, 3, '#9c7a48'); R(2, 11, 14, 3, '#7a5a30'); R(4, 14, 10, 1, '#5e4524'); R(1, 7, 2, 1, '#6b4a24'); R(15, 7, 2, 1, '#6b4a24'); R(6, 4, 1, 6, '#6b4a24'); R(11, 4, 1, 6, '#6b4a24'); return c.toDataURL(); }
+  if (id === I.SHEARS) { R(4, 3, 2, 8, '#d8d8d8'); R(12, 3, 2, 8, '#d8d8d8'); R(6, 9, 6, 2, '#aaa'); g.fillStyle = '#c03030'; g.beginPath(); g.arc(5, 14, 2.5, 0, 7); g.arc(13, 14, 2.5, 0, 7); g.fill(); return c.toDataURL(); }
+  if (id === I.FISHING_ROD) { for (let k = 0; k < 13; k++) R(3 + k, 15 - k, 2, 1, '#8a6232'); R(15, 2, 1, 12, '#e8e8e8'); R(14, 13, 3, 2, '#c03030'); return c.toDataURL(); }
+  if (id === I.RAW_COD || id === I.COOKED_COD) { const a = id === I.RAW_COD ? '#b0a080' : '#a06a3a', b2 = id === I.RAW_COD ? '#d8c8a8' : '#c8904a'; g.fillStyle = a; g.beginPath(); g.ellipse(8, 9, 6, 3.5, 0, 0, 7); g.fill(); R(13, 6, 4, 6, a); R(4, 8, 6, 2, b2); R(4, 7, 1, 1, '#111'); return c.toDataURL(); }
+  if (id === I.SLIME_BALL) { g.fillStyle = '#5aa848'; g.beginPath(); g.arc(9, 9, 6, 0, 7); g.fill(); g.fillStyle = '#8ad870'; g.beginPath(); g.arc(7, 7, 2.5, 0, 7); g.fill(); return c.toDataURL(); }
+  if (id === I.MILK_BUCKET) { R(4, 5, 10, 10, '#c8c8c8'); R(5, 6, 8, 3, '#fafafa'); R(3, 4, 12, 2, '#9a9a9a'); return c.toDataURL(); }
+  if (id === I.SHIELD) { R(4, 2, 10, 10, '#9c7a48'); R(5, 12, 8, 2, '#9c7a48'); R(7, 14, 4, 2, '#9c7a48'); R(8, 2, 2, 14, '#aaa'); R(4, 6, 10, 2, '#aaa'); return c.toDataURL(); }
+  if (id === I.TRIDENT) { for (let k = 0; k < 12; k++) R(3 + k, 15 - k, 1, 1, '#3a8a8a'); R(12, 1, 1, 5, '#6ad0c8'); R(15, 3, 1, 5, '#6ad0c8'); R(14, 1, 2, 2, '#6ad0c8'); R(11, 5, 4, 2, '#3a8a8a'); return c.toDataURL(); }
+  if (isArmor(id)) {
+    const a = armorInfo(id); const M2 = [
+      ['................', '...hhhhhhhhhh...', '..hhhhhhhhhhhh..', '..hh........hh..', '..hh........hh..', '..hh........hh..'],
+      ['..hhh....hhh....', '.hhhhhhhhhhhh...', '.hhhhhhhhhhhh...', '..hhhhhhhhhh....', '...hhhhhhhh.....', '...hhhhhhhh.....', '...hhhhhhhh.....', '...hhhhhhhh.....', '...hhhhhhhh.....', '...hhhhhhhh.....'],
+      ['...hhhhhhhhh....', '...hhhhhhhhh....', '...hhhh.hhhh....', '...hhh...hhh....', '...hhh...hhh....', '...hhh...hhh....', '...hhh...hhh....', '...hhh...hhh....', '...hhh...hhh....'],
+      ['................', '................', '................', '..hhh.....hhh...', '..hhh.....hhh...', '..hhh.....hhh...', '.hhhh....hhhh...', '.hhhh....hhhh...'],
+    ][a.piece];
+    drawMap(g, M2.map((r, y) => (y % 4 === 2 ? r.replace(/h/g, 'd') : r.replace(/^(\.*)h/, '$1d'))), { h: a.color, d: a.dark }); return c.toDataURL();
+  }
   if (isTool(id)) {
     const t = toolInfo(id);
     drawMap(g, TOOL_SHAPES[t.type], { h: t.color, s: '#6b4a24', g: t.dark });
