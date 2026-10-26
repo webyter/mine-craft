@@ -284,6 +284,23 @@ export function buildAtlas() {
   newTile('hospital_sign', (P) => { P.noise([245, 245, 245], 0.02); for (let a = 3; a < 13; a++) for (let b = 6; b < 10; b++) { P.set(a, b, [220, 30, 40]); P.set(b, a, [220, 30, 40]); } });
   newTile('road_line', (P) => { P.noise([46, 46, 50], 0.22); for (let y = 0; y < 16; y++) for (let x = 6; x < 10; x++) P.set(x, y, vary([236, 236, 230], 0.04, P.rnd)); });
   newTile('planter_side', (P) => { P.noise([120, 124, 128], 0.04); for (let x = 0; x < 16; x++) for (let y = 0; y < 3; y++) P.set(x, y, vary([70, 140, 50], 0.1, P.rnd)); });
+  // ---- End + stronghold ----
+  newTile('end_stone', (P) => { P.noise([222, 224, 160], 0.08); for (let k = 0; k < 14; k++) { const x = Math.floor(P.rnd() * 16), y = Math.floor(P.rnd() * 16); P.set(x, y, [196, 196, 132]); P.set(x + 1, y, [206, 208, 144]); } });
+  newTile('end_bricks', (P) => { for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) { const off = Math.floor(y / 4) % 2 ? 4 : 0; let c = vary([226, 228, 168], 0.06, P.rnd); if (y % 4 === 3 || (x + off) % 8 === 7) c = [180, 180, 120]; P.set(x, y, c); } });
+  newTile('frame_side', (P) => { P.noise([222, 224, 160], 0.08); for (let x = 0; x < 16; x++) for (let y = 0; y < 4; y++) P.set(x, y, vary([44, 92, 80], 0.15, P.rnd)); for (let x = 0; x < 16; x += 3) P.set(x, 4, [30, 70, 60]); });
+  const frameTop = (eye) => (P) => { P.noise([44, 92, 80], 0.15); for (let i = 0; i < 16; i++) { P.set(i, 0, [222, 224, 160]); P.set(i, 15, [222, 224, 160]); P.set(0, i, [222, 224, 160]); P.set(15, i, [222, 224, 160]); } for (let y = 4; y < 12; y++) for (let x = 4; x < 12; x++) { const d = Math.hypot(x - 7.5, y - 7.5); if (d < 4) P.set(x, y, eye ? (d < 1.6 ? [10, 20, 16] : [60, 170, 120]) : [24, 52, 46]); } };
+  newTile('frame_top', frameTop(false)); newTile('frame_top_eye', frameTop(true));
+  newTile('end_portal', (P) => { for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) P.set(x, y, vary([8, 14, 22], 0.4, P.rnd)); for (let k = 0; k < 18; k++) { const x = Math.floor(P.rnd() * 16), y = Math.floor(P.rnd() * 16); const c = [[60, 200, 180], [140, 80, 220], [230, 250, 255], [40, 120, 220]][k % 4]; P.set(x, y, c); } });
+  newTile('purpur', (P) => { for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) { let c = vary([168, 122, 168], 0.08, P.rnd); if (x % 8 === 7 || y % 8 === 7) c = [130, 90, 130]; else if (x % 8 === 0 || y % 8 === 0) c = [190, 146, 190]; P.set(x, y, c); } });
+  newTile('purpur_pillar', (P) => { for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) { let c = vary([172, 126, 172], 0.07, P.rnd); if (x === 0 || x === 15) c = [128, 88, 128]; else if (x % 5 === 0) c = [150, 108, 150]; P.set(x, y, c); } });
+  newTile('purpur_pillar_top', (P) => { for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) { const d = Math.max(Math.abs(x - 7.5), Math.abs(y - 7.5)); P.set(x, y, vary(Math.floor(d) % 3 === 0 ? [140, 100, 140] : [176, 130, 176], 0.06, P.rnd)); } });
+  newTile('end_rod', (P) => { P.clear(); for (let y = 1; y < 16; y++) { P.set(7, y, [250, 246, 236]); P.set(8, y, [236, 226, 210]); } for (let x = 6; x < 10; x++) { P.set(x, 14, [180, 160, 200]); P.set(x, 15, [150, 120, 170]); } });
+  newTile('chorus_plant', (P) => { P.noise([96, 60, 96], 0.2); for (let k = 0; k < 10; k++) P.set(Math.floor(P.rnd() * 16), Math.floor(P.rnd() * 16), [170, 130, 170]); });
+  newTile('chorus_flower', (P) => { P.noise([150, 110, 160], 0.12); for (let i = 0; i < 16; i++) { P.set(i, 0, [200, 170, 210]); P.set(0, i, [200, 170, 210]); } for (let k = 0; k < 6; k++) P.set(4 + Math.floor(P.rnd() * 8), 4 + Math.floor(P.rnd() * 8), [230, 210, 240]); });
+  newTile('dragon_egg', (P) => { P.noise([16, 10, 22], 0.4); for (let k = 0; k < 16; k++) P.set(Math.floor(P.rnd() * 16), Math.floor(P.rnd() * 16), [120, 40, 160]); });
+  newTile('cracked_bricks', (P) => { for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) { const off = Math.floor(y / 8) % 2 ? 4 : 0; let c = vary([118, 118, 118], 0.12, P.rnd); if (y % 8 === 7 || (x + off) % 8 === 7) c = [78, 78, 78]; P.set(x, y, c); } let x = 3, y = 1; for (let i = 0; i < 18; i++) { P.set(x, y, [50, 50, 50]); y++; x += P.rnd() < 0.5 ? 1 : 0; if (y > 15) break; } });
+  newTile('mossy_bricks', (P) => { for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) { const off = Math.floor(y / 8) % 2 ? 4 : 0; let c = vary([122, 122, 122], 0.1, P.rnd); if (y % 8 === 7 || (x + off) % 8 === 7) c = [80, 80, 80]; if (P.rnd() < 0.3 + (y > 10 ? 0.3 : 0)) c = vary([80, 110, 50], 0.2, P.rnd); P.set(x, y, c); } });
+  newTile('iron_bars', (P) => { P.clear(); for (let y = 0; y < 16; y++) for (const x of [1, 6, 11]) { P.set(x, y, [150, 154, 160]); P.set(x + 1, y, [100, 104, 110]); } for (const y of [1, 8, 14]) for (let x = 0; x < 16; x++) P.set(x, y, [130, 134, 140]); });
   for (let s = 0; s < 10; s++) newTile('destroy_' + s, (P) => {
     P.clear(); const n = 2 + s * 2;
     for (let k = 0; k < n; k++) { let x = 7 + Math.floor((P.rnd() - 0.5) * (4 + s)), y = 7 + Math.floor((P.rnd() - 0.5) * (4 + s)); const len = 3 + s; for (let i = 0; i < len; i++) { P.set(x, y, [20, 20, 20], 200); x += P.rnd() < 0.5 ? 1 : -1; if (P.rnd() < 0.6) y += P.rnd() < 0.5 ? 1 : -1; } }
@@ -381,6 +398,13 @@ function itemIcon(id) {
   if (id === I.CIRCUIT) { R(2, 3, 14, 12, '#1a7a3a'); R(4, 5, 4, 4, '#222'); R(10, 9, 4, 4, '#222'); for (let k = 0; k < 6; k++) R(3 + k * 2, 14, 1, 2, '#e8c040'); R(8, 7, 6, 1, '#e8c040'); R(5, 10, 1, 4, '#e8c040'); return c.toDataURL(); }
   if (id === I.BATTERY) { R(5, 3, 8, 13, '#2a2a2a'); R(7, 1, 4, 2, '#aaa'); R(5, 3, 8, 4, '#e8c040'); R(8, 9, 2, 5, '#fff'); R(7, 11, 4, 1, '#fff'); return c.toDataURL(); }
   if (id === I.DRONE) { R(6, 7, 6, 4, '#ddd'); R(8, 11, 2, 2, '#222'); R(1, 6, 6, 1, '#555'); R(11, 6, 6, 1, '#555'); R(3, 7, 2, 2, '#888'); R(13, 7, 2, 2, '#888'); R(8, 8, 2, 1, '#3a8ae8'); return c.toDataURL(); }
+  if (id === I.EYE_OF_ENDER) { g.fillStyle = '#1d6a50'; g.beginPath(); g.arc(9, 9, 6.5, 0, 7); g.fill(); g.fillStyle = '#7ae0a8'; g.beginPath(); g.arc(9, 9, 4.5, 0, 7); g.fill(); g.fillStyle = '#0a1a14'; R(8, 5, 2, 8); return c.toDataURL(); }
+  if (id === I.ENDER_PEARL) { g.fillStyle = '#0e3a34'; g.beginPath(); g.arc(9, 9, 6.5, 0, 7); g.fill(); g.fillStyle = '#2a8a78'; g.beginPath(); g.arc(9, 9, 4.5, 0, 7); g.fill(); R(6, 6, 2, 2, '#9af0e0'); return c.toDataURL(); }
+  if (id === I.ELYTRA) { g.fillStyle = '#8a8aa8'; g.beginPath(); g.moveTo(8, 2); g.lineTo(2, 6); g.lineTo(3, 16); g.lineTo(8, 10); g.fill(); g.beginPath(); g.moveTo(10, 2); g.lineTo(16, 6); g.lineTo(15, 16); g.lineTo(10, 10); g.fill(); R(4, 7, 3, 1, '#c8c8e0'); R(11, 7, 3, 1, '#c8c8e0'); R(4, 11, 2, 1, '#5a5a78'); R(12, 11, 2, 1, '#5a5a78'); return c.toDataURL(); }
+  if (id === I.FIREWORK) { R(7, 6, 4, 10, '#d02a2a'); R(7, 8, 4, 2, '#f0e0c0'); R(8, 2, 2, 4, '#e8e0d0'); R(8, 16, 2, 2, '#6b4a24'); R(5, 1, 1, 1, '#ffe040'); R(12, 2, 1, 1, '#40c8ff'); return c.toDataURL(); }
+  if (id === I.BOW) { drawMap(g, ['..........sss...', '.........s..f...', '........s...f...', '.......s....f...', '......s.....f...', '.....s......f...', '....s.......f...', '...s........f...', '..s........f....', '.s........f.....', '.s.......f......', '.s......f.......', '.s.....f........', '..sssff.........'], { s: '#7a5228', f: '#dddddd' }); return c.toDataURL(); }
+  if (id === I.EGG) { g.fillStyle = '#e8dcc0'; g.beginPath(); g.ellipse(9, 10, 5, 6.5, 0, 0, 7); g.fill(); R(6, 7, 2, 2, '#fff8e8'); return c.toDataURL(); }
+  if (id === I.FEATHER) { drawMap(g, ['...........ww...', '..........www...', '.........wwww...', '........wwwws...', '.......wwwws....', '......wwwws.....', '.....wwwws......', '....wwwws.......', '....wwws........', '.....ws.........', '....s...........', '...s............'], { w: '#f4f4f4', s: '#bbb' }); return c.toDataURL(); }
   if (isTool(id)) {
     const t = toolInfo(id);
     drawMap(g, TOOL_SHAPES[t.type], { h: t.color, s: '#6b4a24', g: t.dark });
@@ -397,6 +421,8 @@ function itemIcon(id) {
       [I.LEATHER]: ['#a0602a', '#7a4418', 'paper'], [I.QUARTZ]: ['#f0ece6', '#c8c0b8', 'shard'], [I.GOLD_NUGGET]: ['#f8d848', '#c09020', 'nugget'],
       [I.BLAZE_ROD]: ['#f8c830', '#ff8a10', 'stick'], [I.BLAZE_POWDER]: ['#ffb020', '#ff7010', 'pile'], [I.GHAST_TEAR]: ['#e8f4f8', '#a8d0e0', 'gem'],
       [I.MAGMA_CREAM]: ['#e8701a', '#f8d040', 'round'], [I.NETHER_BRICK]: ['#5a2a30', '#3a1418', 'ingot'],
+      [I.RAW_CHICKEN]: ['#f0c8b0', '#e0a890', 'meat'], [I.COOKED_CHICKEN]: ['#c8843a', '#9a5a20', 'meat'], [I.CHORUS_FRUIT]: ['#8a5a9a', '#c8a0d8', 'round'],
+      [I.STRING]: ['#f0f0f0', '#cfcfcf', 'stick'],
       [I.SEEDS]: ['#5aa02a', '#3a7a1a', 'pile'], [I.WHEAT]: ['#d8b848', '#a88a28', 'stick'], [I.EMERALD]: ['#3ade6a', '#18a040', 'gem'],
     }[id] || ['#f0f', '#000', 'round'];
     blob(g, M[0], M[1], id * 13, M[2]);

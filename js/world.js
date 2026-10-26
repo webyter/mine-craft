@@ -5,6 +5,7 @@ import { B, BLOCKS } from './blocks.js';
 import { tileIndex } from './textures.js';
 import { Settlements } from './structures.js';
 import { genNether, netherBiome, NETHER_BIOMES, fortressNear } from './nether.js';
+import { genEnd, endSurface, buildStrongholds } from './end.js';
 
 export const CS = 16, H = 128, SEA = 28;
 const M = 8, R = CS + M * 2, RH = H + 2, RR = R * R;
@@ -95,13 +96,14 @@ export class World {
     this.rIds = new Uint8Array(RR * RH); this.rSky = new Uint8Array(RR * RH); this.rBlk = new Uint8Array(RR * RH);
     this.queue = new Int32Array(RR * RH * 2);
     this.loot = new Map(); this.crops = new Map();
-    this.settle = type === 'nether' ? null : new Settlements(this);
+    this.settle = (type === 'nether' || type === 'end') ? null : new Settlements(this);
     this.spawners = new Map(); this.portals = [];
   }
   // ---------- terrain ----------
   column(x, z) {
     if (this.type === 'flat') return { h: 4, biome: 0 };
     if (this.type === 'nether') return { h: 40, biome: 10 + netherBiome(this, x, z) };
+    if (this.type === 'end') { const e = endSurface(this, x, z); return { h: e ? e.top : 0, biome: 13 }; }
     const n = this.noise;
     const cont = n.fbm2(x / 700, z / 700, 3);
     const hills = n.fbm2(x / 140, z / 140, 4);
@@ -126,6 +128,7 @@ export class World {
     const chunk = { cx, cz, blocks: new Uint8Array(CS * CS * H), meta: new Uint8Array(CS * CS * H), mesh: null, water: null, dirty: true, built: false };
     this.chunks.set(ckey(cx, cz), chunk);
     if (this.type === 'nether') return genNether(this, chunk);
+    if (this.type === 'end') return genEnd(this, chunk);
     const bl = chunk.blocks, seed = this.seed, n = this.noise;
     const bx = cx * CS, bz = cz * CS;
     const heights = new Int16Array(CS * CS), biomes = new Uint8Array(CS * CS);
@@ -173,6 +176,7 @@ export class World {
         if (carve) bl[i] = y <= 7 ? B.LAVA : 0;
       }
     }
+    if (this.type !== 'flat') buildStrongholds(this, chunk);
     // features
     const setL = (x, y, z, id, force) => {
       x -= bx; z -= bz; if (x < 0 || z < 0 || x >= CS || z >= CS || y < 0 || y >= H) return;

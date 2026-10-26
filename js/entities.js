@@ -83,14 +83,21 @@ const MOBS = {
   ghast: { w: 1.5, h: 3.4, hp: 10, speed: 1.6, drops: [[I.GHAST_TEAR, 0, 1], [I.GUNPOWDER, 0, 2]], sound: 'ghast', hostile: true, flying: true, fireImmune: true, big: true },
   blaze: { w: 0.3, h: 1.8, hp: 20, speed: 1.8, drops: [[I.BLAZE_ROD, 0, 1]], sound: 'blaze', hostile: true, hover: true, fireImmune: true },
   magma_cube: { w: 0.5, h: 1.0, hp: 8, speed: 2.4, drops: [[I.MAGMA_CREAM, 0, 1]], sound: 'slime', hostile: true, hopper: true, dmg: 4, fireImmune: true },
+  enderman: { w: 0.3, h: 2.9, hp: 40, speed: 3.2, drops: [[I.ENDER_PEARL, 0, 1]], sound: 'ender', neutral: true, dmg: 7, solo: true },
+  chicken: { w: 0.22, h: 0.7, hp: 4, speed: 1.2, drops: [[I.RAW_CHICKEN, 1, 1], [I.FEATHER, 0, 2]], sound: 'chicken', passive: true },
+  wolf: { w: 0.3, h: 0.85, hp: 8, speed: 2.8, drops: [], sound: 'wolf', neutral: true, dmg: 4, solo: true },
+  cat: { w: 0.25, h: 0.7, hp: 10, speed: 2.2, drops: [], sound: 'cat', passive: true },
+  end_crystal: { w: 0.9, h: 2, hp: 1, speed: 0, drops: [], crystal: true, fireImmune: true, persist: true },
+  ender_dragon: { w: 3.2, h: 3, hp: 200, speed: 14, drops: [], sound: 'dragon', flying: true, boss: true, big: true, fireImmune: true, persist: true, dmg: 10 },
 };
+MOBS.skeleton.drops = [[I.BONE, 0, 2], [I.ARROW, 0, 2], [I.STRING, 0, 1]];
 MOBS.zombie.burns = true;
 const MODERN = {
   citizen: [0x3a6ab8, 0x2a2a3a, 0x2a1a10, 'tie'], tech: [0x3a3a44, 0x2a3a5a, 0x1a1a1a, 'hood'], doctor: [0x7ac8c0, 0x7ac8c0, 0x3a2a1a, 'coat'],
   officer: [0x1a2a5a, 0x101828, 0x1a1a1a, 'cap'], worker: [0xd86a20, 0x3a4a6a, 0x3a2a1a, 'vest'], shopper: [0xd84a7a, 0x4a6aa8, 0x6a3a1a, 'glasses'],
 };
 export { MODERN };
-const BREED_FOOD = { cow: I.WHEAT, sheep: I.WHEAT, pig: I.WHEAT, villager: I.BREAD };
+const BREED_FOOD = { cow: I.WHEAT, sheep: I.WHEAT, pig: I.WHEAT, villager: I.BREAD, chicken: I.SEEDS, wolf: I.RAW_BEEF, cat: I.RAW_MUTTON };
 export { BREED_FOOD };
 function buildModel(type, opts = {}) {
   const mats = [], g = new THREE.Group(), legs = []; let head, arms = [];
@@ -166,6 +173,48 @@ function buildModel(type, opts = {}) {
     const ring = new THREE.Group(); ring.position.y = 0.9; g.add(ring); arms.push(ring);
     for (let k = 0; k < 8; k++) { const a = k / 8 * Math.PI * 2; const r = box(0.12, 0.7, 0.12, k % 2 ? 0xffa020 : 0xf8d040, mats); r.position.set(Math.cos(a) * 0.55, (k % 2) * 0.45, Math.sin(a) * 0.55); ring.add(r); }
     const smoke = box(0.18, 0.6, 0.18, 0x6a4a2a, mats); smoke.position.y = 0.5; g.add(smoke);
+  } else if (type === 'chicken') {
+    const body = box(0.4, 0.4, 0.55, 0xf4f4f4, mats); body.position.y = 0.5; g.add(body);
+    for (const s2 of [-1, 1]) { const l = pivot(box(0.06, 0.3, 0.06, 0xe8b020, mats), s2 * 0.1, 0.3, 0, -0.15); g.add(l); legs.push(l); const wg = box(0.06, 0.28, 0.4, 0xe8e8e8, mats); wg.position.set(s2 * 0.23, 0.52, 0); g.add(wg); arms.push(wg); }
+    head = new THREE.Group(); head.position.set(0, 0.82, 0.24); head.add(box(0.26, 0.34, 0.2, 0xf4f4f4, mats)); g.add(head);
+    const bk = box(0.14, 0.08, 0.12, 0xe8a020, mats); bk.position.set(0, 0.02, 0.15); head.add(bk);
+    const wat = box(0.08, 0.1, 0.06, 0xd02020, mats); wat.position.set(0, -0.08, 0.12); head.add(wat);
+    for (const s2 of [-1, 1]) { const e = box(0.05, 0.05, 0.02, 0x111111, mats); e.position.set(s2 * 0.1, 0.08, 0.1); head.add(e); }
+  } else if (type === 'wolf' || type === 'cat') {
+    const cat = type === 'cat'; const col = cat ? [0xe8a050, 0xd08838, 0xf0f0f0, 0x3a3a3a][(opts.skin ?? 0) & 3] : 0xd8d4d0;
+    quad(cat ? 0.32 : 0.42, cat ? 0.3 : 0.4, cat ? 0.75 : 0.85, 0, col, cat ? 0.28 : 0.4, col, cat ? 0.32 : 0.4, col, cat ? [0, 0.62, 0.45] : [0, 0.86, 0.5]);
+    const sn = box(cat ? 0.14 : 0.2, cat ? 0.1 : 0.16, 0.16, cat ? 0xf0c8a0 : 0xc8c0b8, mats); sn.position.set(0, -0.06, 0.24); head.add(sn);
+    for (const s2 of [-1, 1]) { const ear = box(0.1, 0.12, 0.06, col, mats); ear.position.set(s2 * 0.12, 0.24, -0.04); head.add(ear); const e = box(0.06, 0.05, 0.02, cat ? 0x2a9a2a : 0x111111, mats); e.position.set(s2 * 0.1, 0.06, 0.185); head.add(e); }
+    const tail = pivot(box(0.1, 0.1, 0.5, col, mats), 0, cat ? 0.5 : 0.7, cat ? -0.38 : -0.43, 0); tail.children[0].position.z = -0.22; tail.rotation.x = 0.5; g.add(tail); arms.push(tail);
+    if (!cat) { const collar = box(0.44, 0.1, 0.1, 0xc02020, mats); collar.position.set(0, 0.74, 0.36); collar.visible = false; g.add(collar); g.userData.collar = collar; }
+  } else if (type === 'enderman') {
+    const blk = 0x111114;
+    const body = box(0.5, 0.75, 0.26, blk, mats); body.position.y = 2.05; g.add(body);
+    for (const s2 of [-1, 1]) { const l = pivot(box(0.12, 1.7, 0.12, blk, mats), s2 * 0.13, 1.7, 0, -0.85); g.add(l); legs.push(l); }
+    for (const s2 of [-1, 1]) { const a = pivot(box(0.12, 1.6, 0.12, blk, mats), s2 * 0.32, 2.38, 0, -0.78); g.add(a); arms.push(a); }
+    head = new THREE.Group(); head.position.set(0, 2.66, 0); head.add(box(0.48, 0.48, 0.48, blk, mats)); g.add(head);
+    for (const s2 of [-1, 1]) { const e = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.05, 0.02), new THREE.MeshBasicMaterial({ color: 0xd060ff })); e.position.set(s2 * 0.12, 0.0, 0.245); head.add(e); }
+  } else if (type === 'end_crystal') {
+    const base = box(0.9, 0.3, 0.9, 0x3a3a3a, mats); base.position.y = 0.15; g.add(base);
+    head = new THREE.Group(); head.position.set(0, 1.3, 0); g.add(head);
+    const outer = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.9, 0.9), new THREE.MeshBasicMaterial({ color: 0xe0a0ff, transparent: true, opacity: 0.45, depthWrite: false }));
+    const core = new THREE.Mesh(new THREE.BoxGeometry(0.45, 0.45, 0.45), new THREE.MeshBasicMaterial({ color: 0xff60c0 }));
+    head.add(outer); head.add(core); arms.push(outer, core);
+  } else if (type === 'ender_dragon') {
+    const blk = 0x18141c, dk = 0x2a2232;
+    const body = box(2.2, 1.6, 4.2, blk, mats); body.position.set(0, 1.6, 0); g.add(body);
+    for (let k = 0; k < 4; k++) { const sp = box(0.3, 0.5, 0.4, dk, mats); sp.position.set(0, 2.6, -1.4 + k * 1); g.add(sp); }
+    const neck = box(0.9, 0.9, 2.2, blk, mats); neck.position.set(0, 2.0, 3.0); g.add(neck);
+    head = new THREE.Group(); head.position.set(0, 2.1, 4.6); g.add(head);
+    head.add(box(1.4, 1.0, 1.6, blk, mats)); const jaw = box(1.1, 0.35, 1.2, dk, mats); jaw.position.set(0, -0.55, 0.6); head.add(jaw);
+    for (const s2 of [-1, 1]) { const e = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.16, 0.05), new THREE.MeshBasicMaterial({ color: 0xc040ff })); e.position.set(s2 * 0.42, 0.22, 0.81); head.add(e); const h2 = box(0.18, 0.5, 0.18, 0x5a5060, mats); h2.position.set(s2 * 0.4, 0.7, -0.4); head.add(h2); }
+    for (let k = 0; k < 6; k++) { const t = box(0.8 - k * 0.1, 0.7 - k * 0.08, 1.1, blk, mats); t.position.set(0, 1.7 + k * 0.05, -2.6 - k * 1.05); g.add(t); }
+    for (const s2 of [-1, 1]) {
+      const wing = new THREE.Group(); wing.position.set(s2 * 1.1, 2.2, 0.4); g.add(wing); arms.push(wing);
+      const bone = box(5.5, 0.25, 0.3, dk, mats); bone.position.x = s2 * 2.75; wing.add(bone);
+      const mem = new THREE.Mesh(new THREE.BoxGeometry(5.5, 0.06, 3.2), new THREE.MeshLambertMaterial({ color: 0x3a2a48, side: THREE.DoubleSide })); mats.push(mem.material); mem.position.set(s2 * 2.75, 0, -1.5); wing.add(mem);
+    }
+    for (const [lx, lz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) { const l = pivot(box(0.4, 1.2, 0.4, blk, mats), lx * 0.8, 1.0, lz * 1.3, -0.6); g.add(l); legs.push(l); }
   } else if (type === 'magma_cube') {
     for (let k = 0; k < 4; k++) { const sl = box(0.98, 0.22, 0.98, k % 2 ? 0x5a1a10 : 0x3a0e08, mats); sl.position.y = 0.12 + k * 0.24; g.add(sl); arms.push(sl); }
     head = new THREE.Group(); head.position.set(0, 0.6, 0); g.add(head);
@@ -219,6 +268,7 @@ export class EntityManager {
     for (const a of this.arrows) this.scene.remove(a.mesh);
     for (const f of this.fireballs) this.scene.remove(f.mesh);
     this.mobs = []; this.items = []; this.tnts = []; this.falling = []; this.arrows = []; this.fireballs = []; this.parts = [];
+    if (this.beam) this.beam.visible = false;
   }
   // ---------- particles ----------
   burst(x, y, z, color, n = 14, speed = 3, size = 0.12, life = 0.8) {
@@ -305,14 +355,19 @@ export class EntityManager {
   }
   hurtMob(m, dmg, fromX, fromZ, fromPlayer = true, kb = 1) {
     if (m.dead || m.hurt > 0.35) return false;
+    if (m.def.boss && m.phase === 'perch') dmg *= 1.5;
     m.hp -= dmg; m.hurt = 0.5;
+    if (fromPlayer) this.game.lastHitMob = m;
+    if (m.def.crystal) { m.dead = 0.01; this.scene.remove(m.model.g); this.mobs.splice(this.mobs.indexOf(m), 1); sfx.crystalBoom(); this.game.explode(m.x, m.y + 1, m.z, 3); return true; }
+    if (m.def.boss) { sfx.dragon(); if (m.hp <= 0) { m.dead = 5; m.hp = 0; this.game.addXP && this.game.addXP(500); return true; } if (m.phase === 'perch' && Math.random() < 0.3) m.phaseT = 0; return true; }
+    if (m.type === 'enderman' && m.hp > 0 && fromPlayer) { m.angry = 30; if (Math.random() < 0.5) this.teleportMob(m, m.x, m.z, 10); }
     const dx = m.x - fromX, dz = m.z - fromZ, d = Math.hypot(dx, dz) || 1;
     const kk = m.def.big ? kb * 0.3 : kb;
     m.vx += dx / d * 6 * kk; m.vz += dz / d * 6 * kk; if (kb) m.vy = m.def.flying ? m.vy : 5;
     sfx.hit(); if (m.def.sound && m.def.passive) sfx[m.def.sound]();
     if (m.def.passive) m.panic = 5;
     if (m.def.golem) { sfx.golem(); if (fromPlayer) m.angry = 20; }
-    if (m.def.neutral && fromPlayer) { for (const o of this.mobs) if (o.type === m.type && Math.hypot(o.x - m.x, o.z - m.z) < 24) o.angry = 30; }
+    if (m.def.neutral && fromPlayer && !m.owner) { if (m.def.solo) m.angry = 30; else for (const o of this.mobs) if (o.type === m.type && Math.hypot(o.x - m.x, o.z - m.z) < 24) o.angry = 30; }
     if (m.def.villager && fromPlayer) { for (const o of this.mobs) if (o.def.golem && Math.hypot(o.x - m.x, o.z - m.z) < 24) o.angry = 20; }
     if (m.hp <= 0) {
       m.dead = 0.8;
@@ -327,11 +382,18 @@ export class EntityManager {
   }
   update(dt) {
     const g = this.game, w = this.world, pl = g.player;
+    if (this.beam) this.beam.visible = false;
     // mobs
     for (let i = this.mobs.length - 1; i >= 0; i--) {
       const m = this.mobs[i]; const md = m.def;
       const dxp = pl.x - m.x, dzp = pl.z - m.z, distP = Math.hypot(dxp, dzp, (pl.y - m.y));
-      if (distP > (m.home ? 140 : 80) || (md.hostile && g.difficulty === 0)) { this.scene.remove(m.model.g); this.mobs.splice(i, 1); continue; }
+      if (!md.persist && !m.owner && (distP > (m.home ? 140 : 80) || (md.hostile && g.difficulty === 0))) { this.scene.remove(m.model.g); this.mobs.splice(i, 1); continue; }
+      if (m.dead > 0 && m.type === 'ender_dragon') {
+        m.dead -= dt; m.y += dt * 2.5; m.model.g.position.set(m.x, m.y, m.z); m.model.g.rotation.y += dt * 0.6;
+        if (Math.random() < dt * 30) this.burst(m.x + (Math.random() - 0.5) * 6, m.y + 1 + Math.random() * 3, m.z + (Math.random() - 0.5) * 6, [1, 0.85, 1], 6, 6, 0.25, 1.2);
+        if (m.dead <= 0) { this.scene.remove(m.model.g); this.mobs.splice(i, 1); g.onDragonDeath && g.onDragonDeath(m); }
+        continue;
+      }
       if (m.dead > 0) {
         m.dead -= dt; m.model.g.rotation.z = Math.min(Math.PI / 2, (0.8 - m.dead) * 4);
         if (m.dead <= 0) { this.burst(m.x, m.y + 0.5, m.z, [0.9, 0.9, 0.9], 16, 2, 0.15); this.scene.remove(m.model.g); this.mobs.splice(i, 1); }
@@ -348,6 +410,13 @@ export class EntityManager {
         m.fireT -= dt; if (Math.random() < dt * 10) this.burst(m.x, m.y + m.h * 0.6, m.z, [1, 0.55, 0.1], 1, 1, 0.1, 0.4);
         m.fireTick = (m.fireTick || 0) + dt; if (m.fireTick > 1) { m.fireTick = 0; m.hurt = 0; this.hurtMob(m, 1, m.x, m.z, false, 0); }
       }
+      if (md.crystal || md.boss) {
+        this.updateEndMob(m, dt, distP, g.mode === 'survival' && !pl.dead);
+        if (md.crystal) m.model.g.position.set(m.x, m.y, m.z);
+        const tint3 = m.hurt > 0.3 ? 0x991111 : 0;
+        if (m.lastTint !== tint3) { for (const mt of m.model.mats) mt.emissive && mt.emissive.setHex(tint3); m.lastTint = tint3; }
+        continue;
+      }
       if (md.flying || md.hover || md.hopper) {
         this.updateNetherMob(m, dt, distP, dxp, dzp, g.mode === 'survival' && !pl.dead);
         if (m.y < -20) { this.scene.remove(m.model.g); this.mobs.splice(i, 1); continue; }
@@ -362,9 +431,14 @@ export class EntityManager {
         m.angry = Math.max(0, (m.angry || 0) - dt);
         if (m.angry > 0 && playerTargetable && distP < 20) target = pl;
         else { m.tgtT = (m.tgtT || 0) - dt; if (m.tgtT < 0 || (m.tgt && m.tgt.dead)) { m.tgtT = 0.5; m.tgt = this.nearest(m, (o) => o.def.hostile && !o.dead, 16); } target = m.tgt; }
+      } else if (m.owner) {
+        m.tgtT = (m.tgtT || 0) - dt;
+        if (m.tgtT < 0 || (m.tgt && m.tgt.dead)) { m.tgtT = 0.5; const lt = g.lastHitMob; m.tgt = lt && !lt.dead && lt !== m && !lt.owner && Math.hypot(lt.x - m.x, lt.z - m.z) < 20 ? lt : this.nearest(m, (o) => o.def.hostile && !o.dead && !o.def.boss, 10); }
+        target = m.tgt && !m.tgt.dead && !m.sitting ? m.tgt : null;
       } else if (md.neutral) {
         m.angry = Math.max(0, (m.angry || 0) - dt);
-        if (m.angry > 0 && playerTargetable && distP < 24) target = pl;
+        if (m.angry > 0 && playerTargetable && distP < (m.type === 'enderman' ? 40 : 24)) target = pl;
+        if (m.type === 'enderman' && target === pl && distP > 9 && Math.random() < dt * 0.4) this.teleportMob(m, pl.x, pl.z, 4);
       } else if (m.type === 'zombie' && !(playerTargetable && distP < 18)) {
         m.tgtT = (m.tgtT || 0) - dt; if (m.tgtT < 0) { m.tgtT = 1; m.tgt = this.nearest(m, (o) => o.def.villager && !o.dead, 14); } target = m.tgt && !m.tgt.dead ? m.tgt : null;
       }
@@ -393,6 +467,13 @@ export class EntityManager {
           if (hd > (md.golem ? 22 : 14)) { m.targetYaw = Math.atan2(hx, hz); m.moving = true; speed = md.speed * 0.7; }
         }
         if (md.villager && m.lookP > 0) { m.lookP -= dt; speed = 0; m.targetYaw = Math.atan2(dxp, dzp); }
+        if (m.owner && m.sitting) { speed = 0; target = null; }
+        else if (m.owner && !(m.willing > 0)) {
+          if (distP > 22 && !pl.flying) { this.teleportMob(m, pl.x, pl.z, 2); }
+          else if (distP > 4) { m.targetYaw = Math.atan2(dxp, dzp); speed = md.speed * (distP > 9 ? 1.3 : 0.9); } else speed = 0;
+        }
+        if (m.type === 'enderman' && Math.random() < dt * 0.02) this.teleportMob(m, m.x, m.z, 14);
+        if (m.type === 'chicken') { m.eggT = (m.eggT ?? 60 + Math.random() * 120) - dt; if (m.eggT < 0 && !m.baby) { m.eggT = 120 + Math.random() * 120; this.dropItem(I.EGG, 1, m.x, m.y + 0.3, m.z, 0, 1, 0); sfx.pop(); } }
         // breeding: walk to a willing partner
         if (m.willing > 0 && !m.baby && !(m.panic > 0)) {
           const mate = this.nearest(m, (o) => o.type === m.type && o.willing > 0 && !o.baby && !o.dead, 8);
@@ -410,7 +491,7 @@ export class EntityManager {
       const fx = Math.sin(m.yaw) * speed, fz = Math.cos(m.yaw) * speed;
       m.vx += (fx - m.vx) * Math.min(1, dt * 8); m.vz += (fz - m.vz) * Math.min(1, dt * 8);
       if (inWater) { m.vy += (2 - m.vy) * dt * 3; } else m.vy -= 28 * dt;
-      m.vy = Math.max(m.vy, -40);
+      m.vy = Math.max(m.vy, m.type === 'chicken' ? -3 : -40);
       const hit = moveEntity(w, m, m.vx * dt, m.vy * dt, m.vz * dt);
       if ((hit.hitX || hit.hitZ) && m.onGround && speed > 0) m.vy = 8.2;
       if (m.y < -20) { this.scene.remove(m.model.g); this.mobs.splice(i, 1); continue; }
@@ -437,6 +518,8 @@ export class EntityManager {
       const sw = Math.sin(m.walk) * Math.min(1, sp) * 0.7;
       m.model.legs.forEach((l, k) => { l.rotation.x = (k % 2 === (k < 2 ? 0 : 1) ? sw : -sw); });
       if (m.model.legs.length === 2) { m.model.legs[0].rotation.x = sw; m.model.legs[1].rotation.x = -sw; }
+      if (m.type === 'chicken') m.model.arms.forEach((a, k) => { a.rotation.z = m.onGround ? 0 : (k ? 1 : -1) * Math.abs(Math.sin(m.walk * 6)) * 0.8; });
+      if ((m.type === 'wolf' || m.type === 'cat') && m.model.arms[0]) m.model.arms[0].rotation.y = Math.sin(performance.now() / (m.owner ? 90 : 400)) * 0.4;
       if (md.golem) { m.swingT = Math.max(0, (m.swingT || 0) - dt); const up = m.swingT > 0 ? -Math.sin(m.swingT / 0.4 * Math.PI) * 2 : 0; m.model.arms.forEach((a, k) => { a.rotation.x = up + (k ? sw : -sw) * 0.6; }); }
       m.model.g.position.set(m.x, m.y, m.z); m.model.g.rotation.y = m.yaw;
       const tint = m.hurt > 0.3 ? 0x991111 : (m.fuse > 0 && Math.sin(m.fuse * 20) > 0 ? 0x666666 : 0);
@@ -448,8 +531,12 @@ export class EntityManager {
       a.x += a.vx * dt; a.y += a.vy * dt; a.z += a.vz * dt;
       a.mesh.position.set(a.x, a.y, a.z); a.mesh.lookAt(a.x + a.vx, a.y + a.vy, a.z + a.vz);
       const hitBlock = SOLID[w.getBlock(Math.floor(a.x), Math.floor(a.y), Math.floor(a.z))];
-      const pd = Math.hypot(pl.x - a.x, pl.y + 0.9 - a.y, pl.z - a.z);
-      if (pd < 0.8 && g.mode === 'survival') { g.damagePlayer(a.dmg, a.x - a.vx, a.z - a.vz); a.life = 0; }
+      if (a.fromPlayer) {
+        for (const o of this.mobs) { if (o.dead || o.owner) continue; const r = o.w + 0.25; if (Math.abs(o.x - a.x) < r && Math.abs(o.z - a.z) < r && a.y > o.y - 0.2 && a.y < o.y + o.h + 0.2) { o.hurt = 0; this.hurtMob(o, a.dmg, a.x - a.vx, a.z - a.vz, true, 0.6); if (a.fire && !o.def.fireImmune) o.fireT = 5; a.life = 0; break; } }
+      } else {
+        const pd = Math.hypot(pl.x - a.x, pl.y + 0.9 - a.y, pl.z - a.z);
+        if (pd < 0.8 && g.mode === 'survival') { g.damagePlayer(a.dmg, a.x - a.vx, a.z - a.vz); a.life = 0; }
+      }
       if (hitBlock || a.life <= 0) { this.scene.remove(a.mesh); this.arrows.splice(i, 1); }
     }
     // fireballs
@@ -457,7 +544,7 @@ export class EntityManager {
       const f = this.fireballs[i]; f.life -= dt;
       f.x += f.vx * dt; f.y += f.vy * dt; f.z += f.vz * dt;
       f.mesh.position.set(f.x, f.y, f.z); f.mesh.rotation.x += dt * 5; f.mesh.rotation.y += dt * 4;
-      if (Math.random() < dt * 20) this.burst(f.x, f.y, f.z, [1, 0.5 + Math.random() * 0.3, 0.1], 1, 0.6, f.big ? 0.22 : 0.1, 0.35);
+      if (Math.random() < dt * 20) this.burst(f.x, f.y, f.z, f.color ? [0.7, 0.3, 1] : [1, 0.5 + Math.random() * 0.3, 0.1], 1, 0.6, f.big ? 0.22 : 0.1, 0.35);
       let boom = SOLID[w.getBlock(Math.floor(f.x), Math.floor(f.y), Math.floor(f.z))] || f.life <= 0;
       const pd = Math.hypot(pl.x - f.x, pl.y + 0.9 - f.y, pl.z - f.z);
       if (!f.deflected && pd < (f.big ? 1.4 : 0.9) && g.mode === 'survival' && !pl.dead) { g.damagePlayer((f.big ? 4 : 5) * [0, 0.5, 1, 1.5][g.difficulty], f.x - f.vx, f.z - f.vz); boom = true; }
@@ -590,14 +677,86 @@ export class EntityManager {
     let dy = m.targetYaw - m.yaw; while (dy > Math.PI) dy -= Math.PI * 2; while (dy < -Math.PI) dy += Math.PI * 2;
     m.yaw += dy * Math.min(1, dt * 4);
   }
-  shootFireball(m, big) {
+  teleportMob(m, cx, cz, rad) {
+    const w = this.world;
+    for (let k = 0; k < 12; k++) {
+      const x = Math.floor(cx + (Math.random() - 0.5) * rad * 2), z = Math.floor(cz + (Math.random() - 0.5) * rad * 2);
+      if (!w.isLoaded(x, z)) continue; const y = w.topSolid(x, z); if (y <= 0 || LIQUID[w.getBlock(x, y, z)]) continue;
+      if (SOLID[w.getBlock(x, y + 1, z)] || SOLID[w.getBlock(x, y + 2, z)] || SOLID[w.getBlock(x, y + 3, z)]) continue;
+      if (Math.abs(y - m.y) > 24) continue;
+      this.burst(m.x, m.y + 1.4, m.z, [0.7, 0.3, 0.9], 14, 2, 0.1, 0.8);
+      m.x = x + 0.5; m.y = y + 1; m.z = z + 0.5; m.vx = m.vz = m.vy = 0;
+      this.burst(m.x, m.y + 1.4, m.z, [0.7, 0.3, 0.9], 14, 2, 0.1, 0.8); sfx.teleport(); return true;
+    }
+    return false;
+  }
+  updateEndMob(m, dt, distP, targetable) {
+    const pl = this.game.player, g = this.game; const t = performance.now() / 1000;
+    if (m.def.crystal) {
+      m.model.arms[0].rotation.set(t * 1.3, t * 1.7, 0); m.model.arms[1].rotation.set(-t * 2, t, t * 0.7);
+      m.model.head.position.y = 1.3 + Math.sin(t * 2 + m.x) * 0.25; return;
+    }
+    // ---- ender dragon ----
+    const diff = [0, 0.5, 1, 1.5][g.difficulty]; const C = this.endCenter || { x: 0, y: 60, z: 0 };
+    m.phaseT = (m.phaseT ?? 6) - dt; m.ang = (m.ang ?? 0);
+    if (!m.phase) m.phase = 'circle';
+    let tx, ty, tz, sp = m.def.speed;
+    if (m.phaseT <= 0) {
+      if (m.phase === 'circle') { const r = Math.random(); m.phase = targetable && r < 0.45 ? 'charge' : r < 0.75 ? 'perch' : 'circle'; m.phaseT = m.phase === 'charge' ? 6 : m.phase === 'perch' ? 16 : 8 + Math.random() * 6; m.landed = false; }
+      else { m.phase = 'circle'; m.phaseT = 8 + Math.random() * 8; }
+      if (m.phase !== 'circle') sfx.dragon();
+    }
+    if (m.phase === 'circle') {
+      m.ang += dt * 0.3; tx = C.x + Math.cos(m.ang) * 58; tz = C.z + Math.sin(m.ang) * 58; ty = C.y + 26 + Math.sin(m.ang * 3) * 6;
+      m.shootCd -= dt;
+      if (targetable && m.shootCd < 0 && distP < 90) { m.shootCd = 6 + Math.random() * 4; this.shootFireball(m, false, 0xb040ff); }
+    } else if (m.phase === 'charge') {
+      if (!targetable) { m.phaseT = 0; tx = C.x; ty = C.y + 30; tz = C.z; }
+      else { tx = pl.x; ty = pl.y + 1; tz = pl.z; sp *= 1.25; }
+    } else {
+      tx = C.x; ty = C.y + 4.2; tz = C.z + 0.5; const dd = Math.hypot(m.x - tx, m.y - ty, m.z - tz);
+      if (dd < 3) { m.landed = true; }
+      if (m.landed) { sp = 0; m.vx *= 0.8; m.vy *= 0.8; m.vz *= 0.8; m.x += (tx - m.x) * dt * 2; m.y += (ty - m.y) * dt * 2; m.z += (tz - m.z) * dt * 2; m.targetYaw = Math.atan2(pl.x - m.x, pl.z - m.z);
+        m.breathT = (m.breathT ?? 2) - dt;
+        if (m.breathT < 0) { m.breathT = 2.5; if (targetable && distP < 12) { g.damagePlayer(4 * diff, m.x, m.z, 'dragon'); } for (let k = 0; k < 20; k++) this.burst(m.x + Math.sin(m.yaw) * (3 + k * 0.4), m.y + 1, m.z + Math.cos(m.yaw) * (3 + k * 0.4), [0.75, 0.3, 0.95], 2, 1.5, 0.2, 1.2); }
+      }
+    }
+    if (sp > 0) {
+      const dx = tx - m.x, dy = ty - m.y, dz = tz - m.z, d = Math.hypot(dx, dy, dz) || 1;
+      m.vx += (dx / d * sp - m.vx) * Math.min(1, dt * 1.4); m.vy += (dy / d * sp - m.vy) * Math.min(1, dt * 1.4); m.vz += (dz / d * sp - m.vz) * Math.min(1, dt * 1.4);
+      m.x += m.vx * dt; m.y += m.vy * dt; m.z += m.vz * dt;
+      m.targetYaw = Math.atan2(m.vx, m.vz);
+    }
+    let dyaw = m.targetYaw - m.yaw; while (dyaw > Math.PI) dyaw -= Math.PI * 2; while (dyaw < -Math.PI) dyaw += Math.PI * 2; m.yaw += dyaw * Math.min(1, dt * 3);
+    // contact damage
+    const cd = Math.hypot(pl.x - m.x, pl.y + 1 - (m.y + 1.5), pl.z - m.z);
+    m.attackCd -= dt;
+    if (targetable && cd < 4.2 && m.attackCd <= 0) {
+      m.attackCd = 1.2; g.damagePlayer(m.def.dmg * diff, m.x, m.z, 'dragon');
+      const k = 1 / (Math.hypot(pl.x - m.x, pl.z - m.z) || 1); pl.vx += (pl.x - m.x) * k * 14; pl.vz += (pl.z - m.z) * k * 14; pl.vy = 9;
+      if (m.phase === 'charge') { m.phase = 'circle'; m.phaseT = 8; }
+    }
+    // crystal healing beam
+    let best = null, bd = 70; for (const o of this.mobs) if (o.def.crystal && !o.dead) { const d = Math.hypot(o.x - m.x, o.y - m.y, o.z - m.z); if (d < bd) { bd = d; best = o; } }
+    if (!this.beam) { this.beam = new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]), new THREE.LineBasicMaterial({ color: 0xff80e0 })); this.beam.frustumCulled = false; this.scene.add(this.beam); }
+    if (best && m.hp < m.def.hp) { m.hp = Math.min(m.def.hp, m.hp + dt * 1.5); }
+    this.beam.visible = !!best;
+    if (best) { const a = this.beam.geometry.attributes.position; a.setXYZ(0, best.x, best.y + best.model.head.position.y, best.z); a.setXYZ(1, m.x, m.y + 1.6, m.z); a.needsUpdate = true; if (this.beam.parent !== this.scene) this.scene.add(this.beam); }
+    // animate
+    const flap = m.landed ? 0.15 : 0.7; m.flapT = (m.flapT || 0) + dt * (m.landed ? 2 : 4.5);
+    m.model.arms[0].rotation.z = Math.sin(m.flapT) * flap; m.model.arms[1].rotation.z = -Math.sin(m.flapT) * flap;
+    if (Math.sin(m.flapT) > 0.98 && !m.landed && distP < 60) noiseFlap(m);
+    m.model.g.rotation.order = 'YXZ'; m.model.g.rotation.y = m.yaw; m.model.g.rotation.x = m.landed ? 0 : -Math.max(-0.5, Math.min(0.5, m.vy / (Math.hypot(m.vx, m.vz) + 1)));
+    m.model.g.position.set(m.x, m.y, m.z);
+  }
+  shootFireball(m, big, color) {
     const pl = this.game.player;
-    const sx = m.x + Math.sin(m.yaw) * (big ? 1.9 : 0.5), sy = m.y + (big ? 2.4 : 1.4), sz = m.z + Math.cos(m.yaw) * (big ? 1.9 : 0.5);
+    const fo = m.def.boss ? 5 : big ? 1.9 : 0.5; const sx = m.x + Math.sin(m.yaw) * fo, sy = m.y + (big ? 2.4 : m.def.boss ? 2 : 1.4), sz = m.z + Math.cos(m.yaw) * fo;
     const tx = pl.x + (big ? 0 : (Math.random() - 0.5) * 1.5), ty = pl.y + 1.1, tz = pl.z + (big ? 0 : (Math.random() - 0.5) * 1.5);
     const d = Math.hypot(tx - sx, ty - sy, tz - sz) || 1; const sp = big ? 11 : 15;
-    const mesh = new THREE.Mesh(new THREE.BoxGeometry(big ? 0.9 : 0.32, big ? 0.9 : 0.32, big ? 0.9 : 0.32), new THREE.MeshBasicMaterial({ color: big ? 0xff7a1a : 0xffb030 }));
+    const mesh = new THREE.Mesh(new THREE.BoxGeometry(big ? 0.9 : color ? 0.7 : 0.32, big ? 0.9 : color ? 0.7 : 0.32, big ? 0.9 : color ? 0.7 : 0.32), new THREE.MeshBasicMaterial({ color: color || (big ? 0xff7a1a : 0xffb030) }));
     mesh.position.set(sx, sy, sz); this.scene.add(mesh);
-    this.fireballs.push({ x: sx, y: sy, z: sz, vx: (tx - sx) / d * sp, vy: (ty - sy) / d * sp, vz: (tz - sz) / d * sp, big, life: 6, mesh, deflected: false });
+    this.fireballs.push({ x: sx, y: sy, z: sz, vx: (tx - sx) / d * sp, vy: (ty - sy) / d * sp, vz: (tz - sz) / d * sp, big, life: 6, mesh, deflected: false, color });
     if (!big) sfx.fireball();
   }
   raycastFireballs(o, d, maxDist) {
@@ -640,5 +799,6 @@ export class EntityManager {
     return best ? { mob: best, t: bt } : null;
   }
 }
+function noiseFlap(m) { if (!m._fl || performance.now() - m._fl > 600) { m._fl = performance.now(); sfx.step(35); } }
 export { MOBS };
 void H;

@@ -35,12 +35,12 @@ export class Settlements {
     return out;
   }
   // nearest settlement of a type; scans cells in rings
-  nearest(type, x, z, rings = 12) {
+  nearest(type, x, z, rings = 12, filt = null) {
     const cgx = Math.floor(x / CELL), cgz = Math.floor(z / CELL); let best = null, bd = Infinity;
     for (let r = 0; r <= rings; r++) {
       for (let gx = cgx - r; gx <= cgx + r; gx++) for (let gz = cgz - r; gz <= cgz + r; gz++) {
         if (Math.max(Math.abs(gx - cgx), Math.abs(gz - cgz)) !== r) continue;
-        const p = this.plan(gx, gz); if (!p || (type && p.type !== type)) continue;
+        const p = this.plan(gx, gz); if (!p || (type && p.type !== type) || (filt && !filt(p))) continue;
         const d = Math.hypot(p.x - x, p.z - z); if (d < bd) { bd = d; best = p; }
       }
       if (best && r >= 2) break;
@@ -69,25 +69,43 @@ export class Settlements {
     return rects;
   }
   // ---------- plan selection ----------
+  cellCenter(gx, gz) { const seed = this.w.seed; return [gx * CELL + MARGIN + Math.floor(hash3(gx, 992, gz, seed) * (CELL - MARGIN * 2)), gz * CELL + MARGIN + Math.floor(hash3(gx, 993, gz, seed) * (CELL - MARGIN * 2))]; }
+  // raw candidate kind of a cell before terrain checks
+  cand(gx, gz) {
+    if (gx === 0 && gz === 0) return 'city';
+    const r = hash3(gx, 991, gz, this.w.seed);
+    return r < 0.27 ? 'city' : r < 0.33 ? 'energy' : r < 0.9 ? 'village' : null;
+  }
+  // big city loses to a higher priority neighbour city (closer than a full city width) -> becomes a town
+  cityRank(gx, gz) { return (gx === 0 && gz === 0) ? 2 : hash3(gx, 995, gz, this.w.seed); }
+  cityKind(gx, gz) {
+    if (gx === 0 && gz === 0) return 'city';
+    const [cx, cz] = this.cellCenter(gx, gz); const my = this.cityRank(gx, gz);
+    for (let dx = -1; dx <= 1; dx++) for (let dz = -1; dz <= 1; dz++) {
+      if (!dx && !dz) continue; const ox = gx + dx, oz = gz + dz;
+      if (this.cand(ox, oz) !== 'city') continue;
+      const [nx, nz] = this.cellCenter(ox, oz);
+      if (Math.max(Math.abs(nx - cx), Math.abs(nz - cz)) < 150 && this.cityRank(ox, oz) > my) return 'town';
+    }
+    return 'city';
+  }
   makePlan(gx, gz) {
     const seed = this.w.seed;
-    const r = hash3(gx, 991, gz, seed);
     const home = gx === 0 && gz === 0;
-    let type = home ? 'city' : r < 0.16 ? 'city' : r < 0.22 ? 'energy' : r < 0.62 ? 'village' : null;
+    let type = this.cand(gx, gz);
     if (!type) return null;
+    const [cx, cz] = this.cellCenter(gx, gz);
     if (type === 'village' || type === 'energy') {
-      // keep villages / farms clear of neighbouring cities
+      // keep villages / farms clear of neighbouring cities and towns
       for (let dx = -1; dx <= 1; dx++) for (let dz = -1; dz <= 1; dz++) {
         if (!dx && !dz) continue; const ox = gx + dx, oz = gz + dz;
-        if ((ox === 0 && oz === 0) || hash3(ox, 991, oz, seed) < 0.16) {
-          const ncx = ox * CELL + MARGIN + Math.floor(hash3(ox, 992, oz, seed) * (CELL - MARGIN * 2)), ncz = oz * CELL + MARGIN + Math.floor(hash3(ox, 993, oz, seed) * (CELL - MARGIN * 2));
-          const mx = gx * CELL + CELL / 2, mz = gz * CELL + CELL / 2;
-          if (Math.max(Math.abs(ncx - mx), Math.abs(ncz - mz)) < 125) return null;
+        if (this.cand(ox, oz) === 'city') {
+          const [ncx, ncz] = this.cellCenter(ox, oz);
+          const lim = this.cityKind(ox, oz) === 'town' ? 100 : 125;
+          if (Math.max(Math.abs(ncx - cx), Math.abs(ncz - cz)) < lim) return null;
         }
       }
     }
-    const cx = gx * CELL + MARGIN + Math.floor(hash3(gx, 992, gz, seed) * (CELL - MARGIN * 2));
-    const cz = gz * CELL + MARGIN + Math.floor(hash3(gx, 993, gz, seed) * (CELL - MARGIN * 2));
     const rnd = mulberry32((hash3(gx, 994, gz, seed) * 4294967296) >>> 0);
     if (home) { // try several spots in the spawn cell for the capital
       for (const [ox, oz] of [[0, 0], [-30, -30], [30, -30], [-30, 30], [30, 30], [0, -40], [0, 40], [-40, 0], [40, 0]]) {
@@ -99,7 +117,11 @@ export class Settlements {
     }
     const c = this.w.column(cx, cz);
     if (c.biome > 3 || (!this.flat && c.h < SEA + 1)) return null;
-    if (type === 'city') { const p = this.makeCity(cx, cz, rnd); if (p) return p; type = 'village'; }
+    if (type === 'city') {
+      const town = this.cityKind(gx, gz) === 'town';
+      const p = this.makeCity(cx, cz, rnd, town ? 3 : 5); if (p) return p;
+      type = 'village';
+    }
     if (type === 'energy') return this.makeEnergy(cx, cz, rnd);
     return this.makeVillage(cx, cz, c.biome, rnd);
   }
@@ -248,6 +270,8 @@ export class Settlements {
       }
     }
     mobs.push({ type: 'villager', prof: 'nitwit', x: cx + 3.5, y: y0 + 1, z: cz - 3.5 });
+    mobs.push({ type: 'cat', x: cx - 2.5, y: y0 + 1, z: cz + 2.5 }); if (houses >= 3) mobs.push({ type: 'cat', x: cx + 2.5, y: y0 + 1, z: cz + 3.5 });
+    for (let i = 0; i < 2; i++) mobs.push({ type: 'chicken', x: cx - 4.5 + i, y: y0 + 1, z: cz - 2.5 });
     if (houses >= 4) mobs.push({ type: 'iron_golem', x: cx - 3.5, y: y0 + 1, z: cz + 3.5 });
     plan.r = occ.reduce((a, o) => [Math.min(a[0], o[0]), Math.min(a[1], o[1]), Math.max(a[2], o[2]), Math.max(a[3], o[3])], [cx, cz, cx, cz]);
     plan.houses = houses;
@@ -371,19 +395,19 @@ export class Settlements {
   }
 
   // ---------- cities ----------
-  makeCity(cx, cz, rnd) {
-    const NB = 5, P = 26, RW = 7, SZ = NB * P + RW; const half = Math.floor(SZ / 2);
+  makeCity(cx, cz, rnd, NB = 5) {
+    const town = NB < 5; const P = 26, RW = 7, SZ = NB * P + RW; const half = Math.floor(SZ / 2);
     const x0 = cx - half, z0 = cz - half;
     const hs = []; let wet = 0, high = 0;
     for (let i = 0; i <= 7; i++) for (let j = 0; j <= 7; j++) {
       const x = x0 + Math.round(i * SZ / 7), z = z0 + Math.round(j * SZ / 7); const c = this.w.column(x, z);
       if (!this.flat && c.h < SEA) wet++; if (c.h > 60 || c.biome === 4) high++; hs.push(c.h);
     }
-    if (wet > 14 || high > 6) return null;
+    if (wet > (town ? 10 : 14) || high > 6) return null;
     hs.sort((a, b) => a - b);
     const base = this.flat ? 4 : Math.max(SEA + 2, Math.min(SEA + 10, hs[Math.floor(hs.length / 2)]));
     const pieces = [], mobs = [];
-    const plan = { type: 'city', x: cx, z: cz, y: base, pieces, mobs, r: [x0 - 5, z0 - 5, x0 + SZ + 4, z0 + SZ + 4], name: cityName(rnd),
+    const plan = { type: 'city', x: cx, z: cz, y: base, pieces, mobs, r: [x0 - 5, z0 - 5, x0 + SZ + 4, z0 + SZ + 4], name: town ? cityName(rnd).replace(' City', '') + ' Town' : cityName(rnd), town,
       grid: { x0, z0, P, RW, SZ, NB, base }, signals: [], screens: [], parked: [], turbines: [], kinds: [] };
     const self = this;
     const roadInfo = (lu, lv) => {
@@ -434,13 +458,13 @@ export class Settlements {
     // ---- lots ----
     const inner = [], outer = [];
     for (let i = 0; i < NB; i++) for (let j = 0; j < NB; j++) {
-      if (i === 2 && j === 2) continue;
-      ((i >= 1 && i <= 3 && j >= 1 && j <= 3) ? inner : outer).push([i, j]);
+      const C = (NB - 1) >> 1; if (i === C && j === C) continue;
+      ((i >= 1 && i <= NB - 2 && j >= 1 && j <= NB - 2) ? inner : outer).push([i, j]);
     }
     shuffle(inner, rnd); shuffle(outer, rnd);
-    const assign = [[2, 2, 'plaza']];
+    const assign = [[(NB - 1) >> 1, (NB - 1) >> 1, 'plaza']];
     inner.forEach(([i, j], n) => assign.push([i, j, n === 0 ? 'techhq' : rnd() < 0.72 ? 'skyscraper' : 'office']));
-    const must = ['hospital', 'mall', 'evstation', 'datacenter', 'police', rnd() < 0.7 ? 'stadium' : 'park', 'construction', 'parking'];
+    const must = town ? ['shops', 'apartment', 'evstation', rnd() < 0.5 ? 'police' : 'hospital', 'park', 'apartment', rnd() < 0.5 ? 'office' : 'skyscraper', 'shops'] : ['hospital', 'mall', 'evstation', 'datacenter', 'police', rnd() < 0.7 ? 'stadium' : 'park', 'construction', 'parking'];
     outer.forEach(([i, j], n) => { const r = rnd(); assign.push([i, j, must[n] || (r < 0.38 ? 'apartment' : r < 0.6 ? 'shops' : r < 0.72 ? 'park' : r < 0.86 ? 'office' : 'skyscraper')]); });
     for (const [i, j, kind] of assign) {
       const lx0 = x0 + RW + i * P, lz0 = z0 + RW + j * P, n = P - RW; // 19x19

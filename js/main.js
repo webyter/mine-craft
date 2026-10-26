@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import { hashSeed, mulberry32 } from './noise.js';
 import { B, I, BLOCKS, ITEMS, isBlock, isTool, toolInfo, toolId, itemName, maxDur, maxStack, SMELT, FUEL, CREATIVE_LIST, ENCH, enchKind, enchLevel, enchText, rollEnchants } from './blocks.js';
 import { fortressNear, NETHER_BIOMES, netherBiome } from './nether.js';
+import { endPillars, strongholdNear, endCityNear, FRAME_RING, GATEWAY, GATE_ISLAND, ARRIVAL, END_TOP } from './end.js';
 import { buildAtlas, tileIndex, iconFor } from './textures.js';
 import { World, initTables, CS, H, SEA, SOLID, LIQUID, OPAQUE, EMIT, ckey } from './world.js';
 import { EntityManager, moveEntity, collides, blockGeometry, MOBS, BREED_FOOD } from './entities.js';
@@ -217,6 +218,7 @@ function newWorld({ seedText = '', mode = 'survival', difficulty = 2, type = 'in
   game.world = new World(seed, type); game.dim = 'overworld'; game.dims = { overworld: { world: game.world } }; game.mode = mode; game.difficulty = difficulty; game.worldName = name;
   game.ticks = 1000; game.raining = false; game.rainT = 900 + Math.random() * 1200;
   if (!ents) ents = new EntityManager(game); else { ents.world = game.world; }
+  player.elytra = null; player.gliding = false; game.endState = null; if (typeof setElytraBtn === 'function') setElytraBtn();
   player.portalT = 0; player.portalCd = false; player.enchSeed = (Math.random() * 1e9) | 0;
   game.ents = ents;
   game.inv.clear(); game.inv.sel = 0;
@@ -238,7 +240,7 @@ function newWorld({ seedText = '', mode = 'survival', difficulty = 2, type = 'in
   ui.renderHotbar(); rebuildHand();
 }
 function resetPlayer() {
-  Object.assign(player, { x: player.spawn.x, y: player.spawn.y, z: player.spawn.z, vx: 0, vy: 0, vz: 0, health: 20, food: 20, sat: 5, exh: 0, air: 300, fallStart: null, dead: false, flying: false, hurtCd: 0 });
+  Object.assign(player, { x: player.spawn.x, y: player.spawn.y, z: player.spawn.z, vx: 0, vy: 0, vz: 0, health: 20, food: 20, sat: 5, exh: 0, air: 300, fallStart: null, dead: false, flying: false, hurtCd: 0, gliding: false, boostT: 0 });
   if (game.mode === 'creative') player.flying = false;
 }
 
@@ -378,7 +380,7 @@ game.damagePlayer = (amount, fx, fz, cause = 'mob') => {
   player.exh += 0.1;
   if (player.health <= 0) die(cause);
 };
-const DEATH_MSG = { mob: 'was slain by a monster', fall: 'fell from a high place', lava: 'tried to swim in lava', drown: 'drowned', starve: 'starved to death', explode: 'blew up', void: 'fell out of the world', cactus: 'was pricked to death' };
+const DEATH_MSG = { mob: 'was slain by a monster', fall: 'fell from a high place', lava: 'tried to swim in lava', drown: 'drowned', starve: 'starved to death', explode: 'blew up', void: 'fell out of the world', cactus: 'was pricked to death', dragon: 'was slain by the Ender Dragon', kinetic: 'experienced kinetic energy', enderman: 'was slain by an Enderman' };
 function die(cause) {
   player.dead = true; player.health = 0;
   for (let i = 0; i < 36; i++) { const s = game.inv.slots[i]; if (s) ents.dropItem(s.id, s.count, player.x, player.y + 1, player.z, (Math.random() - 0.5) * 6, 4, (Math.random() - 0.5) * 6, s.dur, s.ench); }
@@ -526,6 +528,8 @@ function entMesh(e) { return e.model ? e.model.g : e.mesh; }
 function switchDim(target, opts = {}) {
   if (player.riding) exitCar();
   if (ui.screen) ui.close();
+  if (game.dim === 'end' && target !== 'end') opts = { ...opts, fromEnd: true };
+  player.gliding = false;
   const cur = game.dims[game.dim];
   cur.world = game.world; cur.fluidQ = game.fluidQ; cur.lavaQ = game.lavaQ; cur.ents = {};
   for (const k of ENT_LISTS) { cur.ents[k] = ents[k]; for (const e of ents[k]) scene.remove(entMesh(e)); ents[k] = []; }
@@ -533,12 +537,14 @@ function switchDim(target, opts = {}) {
   for (const [, m] of game.chunkMeshes) { if (m.solid) { scene.remove(m.solid); m.solid.geometry.dispose(); } if (m.water) { scene.remove(m.water); m.water.geometry.dispose(); } }
   game.chunkMeshes.clear(); for (const [, c] of game.world.chunks) c.built = false;
   let d = game.dims[target];
-  if (!d) d = game.dims[target] = { world: new World((game.seed + 1) >>> 0, 'nether'), fluidQ: new Map(), lavaQ: new Map(), ents: null };
+  if (!d) d = game.dims[target] = { world: new World((game.seed + (target === 'end' ? 2 : 1)) >>> 0, target), fluidQ: new Map(), lavaQ: new Map(), ents: null };
   game.dim = target; game.world = d.world; ents.world = d.world; game.fluidQ = d.fluidQ || new Map(); game.lavaQ = d.lavaQ || new Map();
   if (d.ents) for (const k of ENT_LISTS) { ents[k] = d.ents[k] || []; for (const e of ents[k]) scene.add(entMesh(e)); }
   game.lastSettlement = null;
   // destination
   if (opts.respawn) { arrival = { respawn: true }; player.x = player.spawn.x; player.z = player.spawn.z; player.y = player.spawn.y; }
+  else if (target === 'end') { arrival = { end: opts.outer ? 'outer' : 'main' }; const A = opts.outer ? { x: GATE_ISLAND.x, z: GATE_ISLAND.z + 30 } : ARRIVAL; player.x = A.x + 0.5; player.z = A.z + 0.5; player.y = 90; }
+  else if (opts.fromEnd && target === 'overworld') { arrival = { respawn: true }; player.x = player.spawn.x; player.z = player.spawn.z; player.y = player.spawn.y; }
   else {
     const k = target === 'nether' ? 1 / 8 : 8;
     const tx = Math.floor(player.x * k), tz = Math.floor(player.z * k);
@@ -548,7 +554,7 @@ function switchDim(target, opts = {}) {
     player.x = px + 0.5; player.z = pz + 0.5; player.y = 60;
   }
   player.vx = player.vy = player.vz = 0; player.portalT = 0; player.portalCd = true; player.fallStart = null;
-  $('load-text').textContent = target === 'nether' ? 'Entering the Nether…' : 'Returning to the Overworld…';
+  $('load-text').textContent = target === 'nether' ? 'Entering the Nether…' : target === 'end' ? 'Entering the End…' : 'Returning to the Overworld…';
   startLoading('dim');
 }
 function finishArrival() {
@@ -567,12 +573,99 @@ function finishArrival() {
     sfx.portalTravel();
   } else if (arrival && arrival.respawn) {
     const t = w.topSolid(Math.floor(player.x), Math.floor(player.z)); if (player.y < t + 1) player.y = t + 1.01;
+  } else if (arrival && arrival.end) {
+    const t = w.topSolid(Math.floor(player.x), Math.floor(player.z)); player.y = (t > 0 ? t : 60) + 1.01; player.yaw = arrival.end === 'main' ? Math.PI / 2 : 0; player.pitch = 0.1;
+    sfx.portalTravel(); setupEnd(); if (arrival.end === 'outer' && !game.world.returnGate) { game.world.returnGate = true; buildReturnGateway(); }
   }
-  arrival = null;
+  const wasEnd = arrival && arrival.end; arrival = null;
   show(null); $('hud').classList.remove('hidden'); game.state = 'playing'; ui.lastStats = ''; ui.renderStats(player, game.mode);
-  toast(game.dim === 'nether' ? 'The Nether' : game.worldName, 2000); resize();
+  toast(game.dim === 'nether' ? 'The Nether' : game.dim === 'end' ? (wasEnd === 'outer' ? 'The Outer End Islands' : 'The End') : game.worldName, 2000); resize();
 }
 game.switchDim = switchDim;
+// ---------- the End ----------
+function setupEnd() {
+  const w = game.world; game.endState = game.endState || { dragonDead: false };
+  ents.endCenter = { x: 0, y: END_TOP, z: 0 };
+  if (game.endState.dragonDead) return;
+  if (!ents.mobs.some((m) => m.type === 'ender_dragon')) {
+    if (!game.endState.crystals) { game.endState.crystals = true; for (const pl of endPillars(w)) ents.spawnMob('end_crystal', pl.x + 0.5, pl.top + 2, pl.z + 0.5); }
+    ents.spawnMob('ender_dragon', 0.5, END_TOP + 32, 0.5);
+  }
+}
+function setB(x, y, z, id) { if (game.world.chunks.has(ckey(x >> 4, z >> 4))) game.setBlock(x, y, z, id); }
+game.onDragonDeath = () => {
+  const w = game.world; game.endState = game.endState || {}; game.endState.dragonDead = true;
+  w.endPortalOpen = true; w.endEgg = true; w.gatewayOpen = true;
+  for (let dx = -3; dx <= 3; dx++) for (let dz = -3; dz <= 3; dz++) { const r = Math.hypot(dx, dz); if (r < 2.6 && (dx || dz)) setB(dx, END_TOP, dz, B.END_PORTAL); }
+  setB(0, END_TOP + 4, 0, B.DRAGON_EGG);
+  const G = GATEWAY; setB(G.x, G.y, G.z, B.END_PORTAL); setB(G.x, G.y - 2, G.z, B.BEDROCK); setB(G.x, G.y + 2, G.z, B.BEDROCK);
+  for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { setB(G.x + dx, G.y - 1, G.z + dz, B.BEDROCK); setB(G.x + dx, G.y + 1, G.z + dz, B.BEDROCK); }
+  sfx.endPortal(); toast('The Ender Dragon has been slain. The exit portal is open.', 4200); chatLog('A gateway to the outer islands opened at ' + G.x + ', ' + G.y + ', ' + G.z);
+};
+function buildReturnGateway() {
+  // small gateway on the outer island that leads back to the main island
+  const w = game.world; const x = Math.floor(player.x) + 3, z = Math.floor(player.z); const y = Math.max(w.topSolid(x, z), 30) + 2;
+  game.setBlock(x, y, z, B.END_PORTAL); game.setBlock(x, y - 2, z, B.BEDROCK); game.setBlock(x, y + 2, z, B.BEDROCK);
+  for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { game.setBlock(x + dx, y - 1, z + dz, B.BEDROCK); game.setBlock(x + dx, y + 1, z + dz, B.BEDROCK); }
+}
+function checkEndPortal(x, y, z) {
+  const w = game.world;
+  for (let cx = x - 2; cx <= x + 2; cx++) for (let cz = z - 2; cz <= z + 2; cz++) {
+    if (FRAME_RING.every(([dx, dz]) => w.getBlock(cx + dx, y, cz + dz) === B.END_FRAME_EYE)) {
+      for (let dx = -1; dx <= 1; dx++) for (let dz = -1; dz <= 1; dz++) game.setBlock(cx + dx, y, cz + dz, B.END_PORTAL);
+      sfx.endPortal(); toast('The End portal opens', 3000); return true;
+    }
+  }
+  return false;
+}
+function throwEye() {
+  if (game.dim !== 'overworld') { toast('The eye of ender does nothing here'); return; }
+  const sh = strongholdNear(game.world, player.x, player.z); if (!sh) { toast('No stronghold nearby'); return; }
+  const tx = sh.portal.x + 0.5, tz = sh.portal.z + 0.5; const d = Math.hypot(tx - player.x, tz - player.z);
+  const mesh = new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.25, 0.25), new THREE.MeshBasicMaterial({ color: 0x2fae86 })); scene.add(mesh);
+  const ux = (tx - player.x) / (d || 1), uz = (tz - player.z) / (d || 1); const fly = Math.min(12, d);
+  const eye = { x: player.x, y: player.y + 1.5, z: player.z, t: 0, mesh, ux, uz, fly, y0: player.y + 1.5 };
+  eyes.push(eye); sfx.eye(); swing();
+  if (game.mode === 'survival') game.inv.consumeHeld(1);
+  const dirs = ['east', 'south-east', 'south', 'south-west', 'west', 'north-west', 'north', 'north-east'];
+  const ang = Math.atan2(tz - player.z, tx - player.x); const di = ((Math.round(ang / (Math.PI / 4)) % 8) + 8) % 8;
+  toast(d < 8 ? 'The stronghold portal room is right below you' : `The eye flies ${dirs[di]} — stronghold about ${Math.round(d)} blocks away`, 3000);
+}
+const eyes = [];
+function updateEyes(dt) {
+  for (let i = eyes.length - 1; i >= 0; i--) {
+    const e = eyes[i]; e.t += dt; const k = Math.min(1, e.t / 2);
+    e.x += e.ux * e.fly * dt / 2 * (k < 1 ? 1 : 0); e.z += e.uz * e.fly * dt / 2 * (k < 1 ? 1 : 0); e.y = e.y0 + Math.sin(k * Math.PI / 2) * 5;
+    e.mesh.position.set(e.x, e.y, e.z); e.mesh.rotation.y += dt * 4;
+    if (Math.random() < dt * 20) ents.burst(e.x, e.y, e.z, [0.7, 0.3, 1], 1, 0.3, 0.06, 0.5);
+    if (e.t > 2.8) {
+      scene.remove(e.mesh); eyes.splice(i, 1);
+      if (Math.random() < 0.8) { const y = game.world.topSolid(Math.floor(e.x), Math.floor(e.z)) + 1.2; ents.dropItem ? ents.dropItem(I.EYE_OF_ENDER, 1, e.x, Math.max(y, 2), e.z) : game.inv.add(I.EYE_OF_ENDER, 1); }
+      else { ents.burst(e.x, e.y, e.z, [0.3, 0.8, 0.6], 14, 2, 0.1); sfx.eye(); toast('The eye of ender shattered'); }
+    }
+  }
+}
+function shootBow() {
+  const h = game.inv.held(); const inf = enchLevel(h, 'infinity'); const pw = enchLevel(h, 'power'); const flame = enchLevel(h, 'flame');
+  if (game.mode === 'survival' && !inf && !game.inv.count(I.ARROW)) { toast('You need arrows to shoot'); return; }
+  if (bowCd > 0) return; bowCd = 0.55;
+  if (game.mode === 'survival') { if (!inf) game.inv.remove(I.ARROW, 1); game.inv.damageHeld(1); }
+  const d = new THREE.Vector3(); camera.getWorldDirection(d); const sp = 34;
+  const mesh = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.05, 0.5), new THREE.MeshLambertMaterial({ color: 0x8a6232 })); scene.add(mesh);
+  ents.arrows.push({ x: camera.position.x + d.x * 0.6, y: camera.position.y + d.y * 0.6 - 0.1, z: camera.position.z + d.z * 0.6, vx: d.x * sp, vy: d.y * sp + 1, vz: d.z * sp, life: 4, mesh, dmg: Math.round(6 + pw * 1.5), fromPlayer: true, fire: !!flame });
+  sfx.bow(); swing();
+}
+let bowCd = 0;
+function teleportPlayer(x, y, z) { player.x = x; player.y = y; player.z = z; player.vx = player.vy = player.vz = 0; player.fallStart = null; sfx.teleport(); ents.burst(x, y + 1, z, [0.6, 0.2, 0.9], 16, 2, 0.1); }
+function chorusTeleport() {
+  const w = game.world;
+  for (let a = 0; a < 16; a++) {
+    const x = Math.floor(player.x + (Math.random() - 0.5) * 16), z = Math.floor(player.z + (Math.random() - 0.5) * 16);
+    if (!w.isLoaded(x, z)) continue;
+    for (let y = Math.min(H - 3, Math.floor(player.y) + 8); y > Math.max(1, player.y - 8); y--) if (SOLID[w.getBlock(x, y - 1, z)] && !SOLID[w.getBlock(x, y, z)] && !SOLID[w.getBlock(x, y + 1, z)] && !LIQUID[w.getBlock(x, y, z)]) { teleportPlayer(x + 0.5, y, z + 0.5); return; }
+  }
+}
+function setElytraBtn() { const b = $('btn-elytra'); if (b) b.classList.toggle('hidden', !player.elytra); }
 let netherT = 0;
 function tickNetherSpawning() {
   const w = game.world; netherT++;
@@ -602,6 +695,50 @@ function tickNetherSpawning() {
       if (open) ents.spawnMob('ghast', x + 0.5, y + 2, z + 0.5);
     }
   }
+}
+
+let endSpawnT = 0;
+function tickEndSpawning() {
+  const w = game.world; endSpawnT++;
+  if (ents.mobs.filter((m) => m.type === 'enderman').length >= 7) return;
+  for (let a = 0; a < 3; a++) {
+    const ang = Math.random() * Math.PI * 2, d = 16 + Math.random() * 28;
+    const x = Math.floor(player.x + Math.cos(ang) * d), z = Math.floor(player.z + Math.sin(ang) * d);
+    if (!w.isLoaded(x, z)) continue; const y = w.topSolid(x, z);
+    if (y < 10 || w.getBlock(x, y, z) !== B.END_STONE) continue;
+    ents.spawnMob('enderman', x + 0.5, y + 1, z + 0.5); break;
+  }
+}
+function tickStrongholdSpawners() {
+  const w = game.world; if (game.difficulty === 0) return;
+  for (const [, sp] of w.spawners) {
+    if (Math.hypot(sp.x - player.x, sp.y - player.y, sp.z - player.z) > 16) continue;
+    sp.t = (sp.t || 0) - 1; if (sp.t > 0) continue; sp.t = 8 + Math.floor(Math.random() * 10);
+    const type = sp.type || 'zombie';
+    if (ents.mobs.filter((m) => m.type === type && Math.hypot(m.x - sp.x, m.z - sp.z) < 10).length >= 4) continue;
+    for (let a = 0; a < 6; a++) {
+      const x = sp.x + Math.floor((Math.random() - 0.5) * 7), y = sp.y + Math.floor(Math.random() * 3) - 1, z = sp.z + Math.floor((Math.random() - 0.5) * 7);
+      if (!SOLID[w.getBlock(x, y, z)] && !SOLID[w.getBlock(x, y + 1, z)] && SOLID[w.getBlock(x, y - 1, z)]) { ents.spawnMob(type, x + 0.5, y, z + 0.5); ents.burst(x + 0.5, y + 1, z + 0.5, [0.3, 0.3, 0.3], 10, 1.5, 0.12); break; }
+    }
+  }
+}
+let stareT = 0;
+function tickEndermanStare(dt) {
+  stareT -= dt; if (stareT > 0) return; stareT = 0.25;
+  if (game.mode !== 'survival' || player.dead) return;
+  const o = camera.position; const d = new THREE.Vector3(); camera.getWorldDirection(d);
+  const hit = ents.raycastMobs(o, d, 48);
+  if (hit && hit.mob.type === 'enderman' && !(hit.mob.angry > 0)) {
+    const m = hit.mob; const bh = game.world.raycast(o.x, o.y, o.z, d.x, d.y, d.z, hit.t, (id) => id !== 0 && OPAQUE[id]);
+    if (!bh) { m.angry = 30; sfx.ender(); m.stareShake = 0.6; }
+  }
+}
+function updateBossBar() {
+  const el = $('bossbar'); if (!el) return;
+  const dr = game.dim === 'end' ? ents.mobs.find((m) => m.type === 'ender_dragon' && !m.dead) : null;
+  const show = !!dr && Math.hypot(dr.x - player.x, dr.z - player.z) < 180 && game.state === 'playing';
+  el.classList.toggle('hidden', !show);
+  if (show) { const f = Math.max(0, dr.hp / dr.def.hp); $('bossbar-fill').style.width = (f * 100).toFixed(1) + '%'; const n = ents.mobs.filter((m) => m.type === 'end_crystal').length; $('bossbar-name').textContent = 'Ender Dragon' + (n ? ' · ' + n + ' crystals' : ''); }
 }
 
 // ---------- explosions ----------
@@ -674,14 +811,18 @@ const LOOT = {
   mall: [[I.EMERALD, 1, 4, 0.8], [I.SMARTPHONE, 1, 1, 0.25], [I.BATTERY, 1, 3, 0.5], [I.CIRCUIT, 1, 2, 0.4], [B.LED_SCREEN, 2, 6, 0.4], [I.BREAD, 2, 5, 0.6], [I.STEAK, 1, 4, 0.5], [B.GLASS_BLUE, 4, 12, 0.4]],
   city: [[I.SMARTPHONE, 1, 1, 0.3], [I.CIRCUIT, 1, 3, 0.5], [I.BATTERY, 1, 2, 0.4], [I.EMERALD, 2, 6, 0.9], [I.IRON_INGOT, 2, 6, 0.7], [I.GOLD_INGOT, 1, 4, 0.5], [I.DIAMOND, 1, 3, 0.3], [B.GLOWSTONE, 1, 4, 0.5], [I.BREAD, 2, 5, 0.6], [I.STEAK, 1, 4, 0.5]],
   fortress: [[I.GOLD_INGOT, 1, 4, 0.7], [I.IRON_INGOT, 1, 5, 0.6], [I.DIAMOND, 1, 3, 0.3], [B.OBSIDIAN, 2, 6, 0.4], [I.FLINT_STEEL, 1, 1, 0.35], [I.GOLD_NUGGET, 3, 12, 0.5], [I.BLAZE_ROD, 1, 2, 0.25], [I.LAPIS, 3, 9, 0.4], [toolId(3, 3), 1, 1, 0.25]],
+  stronghold: [[I.ENDER_PEARL, 1, 3, 0.6], [I.IRON_INGOT, 1, 5, 0.7], [I.BREAD, 1, 3, 0.6], [I.DIAMOND, 1, 3, 0.25], [I.EYE_OF_ENDER, 1, 2, 0.35], [I.GOLD_INGOT, 1, 3, 0.4], [I.APPLE, 1, 3, 0.5], [toolId(2, 3), 1, 1, 0.3]],
+  stronghold_library: [[I.BOOK, 2, 6, 0.9], [I.PAPER, 3, 9, 0.8], [I.LAPIS, 3, 9, 0.5], [B.BOOKSHELF, 1, 3, 0.4], [I.ENDER_PEARL, 1, 2, 0.35], [I.EMERALD, 1, 3, 0.4]],
+  end_city: [[I.DIAMOND, 2, 6, 0.6], [I.IRON_INGOT, 3, 8, 0.7], [I.GOLD_INGOT, 2, 7, 0.6], [I.EMERALD, 2, 6, 0.5], [toolId(3, 3), 1, 1, 0.35, 1], [toolId(3, 0), 1, 1, 0.3, 1], [I.FIREWORK, 3, 9, 0.5], [I.CHORUS_FRUIT, 2, 6, 0.5], [I.ENDER_PEARL, 1, 3, 0.5]],
+  end_city_elytra: [[I.ELYTRA, 1, 1, 1], [I.FIREWORK, 8, 16, 1], [I.DIAMOND, 2, 5, 0.8], [toolId(3, 3), 1, 1, 0.6, 1], [I.EMERALD, 3, 8, 0.6]],
   shop: [[I.EMERALD, 1, 4, 0.8], [B.GLASS, 4, 12, 0.5], [B.BRICKS, 4, 12, 0.4], [B.TORCH, 4, 10, 0.5], [I.BREAD, 2, 5, 0.6], [I.COOKED_PORK, 1, 4, 0.5], [B.LAMP, 1, 3, 0.3]],
 };
 function fillLoot(slots, table) {
-  for (const [id, a, b, p] of LOOT[table] || LOOT.house) {
+  for (const [id, a, b, p, en] of LOOT[table] || LOOT.house) {
     if (Math.random() > p) continue;
     const n = a + Math.floor(Math.random() * (b - a + 1)); let i = Math.floor(Math.random() * 27), tries = 0;
     while (slots[i] && tries++ < 30) i = Math.floor(Math.random() * 27);
-    slots[i] = { id, count: Math.min(n, maxStack(id)), dur: maxDur(id) };
+    slots[i] = { id, count: Math.min(n, maxStack(id)), dur: maxDur(id) }; if (en) { const e = rollEnchants(id, 20 + Math.floor(Math.random() * 10), Math.random); if (e && Object.keys(e).length) slots[i].ench = e; }
   }
 }
 // ---------- crops ----------
@@ -727,7 +868,7 @@ function tickSettlements(dt) {
   }
   // announce arrival
   const here = w.settle.at(Math.floor(px), Math.floor(pz));
-  if (here !== game.lastSettlement) { game.lastSettlement = here; if (here) toast((here.type === 'village' ? 'Village of ' : '') + here.name + (here.type === 'city' ? ' — population ' + (here.mobs.length * 1250).toLocaleString() : ''), 2600); }
+  if (here !== game.lastSettlement) { game.lastSettlement = here; if (here) toast((here.type === 'village' ? 'Village of ' : '') + here.name + (here.type === 'city' ? ' — population ' + (here.mobs.length * (here.town ? 320 : 1250)).toLocaleString() : ''), 2600); }
 }
 const TRADES = {
   farmer: [[[I.WHEAT, 20], [I.EMERALD, 1]], [[B.PUMPKIN, 6], [I.EMERALD, 1]], [[I.EMERALD, 1], [I.BREAD, 6]], [[I.EMERALD, 1], [I.APPLE, 4]], [[I.EMERALD, 1], [I.SEEDS, 12]]],
@@ -773,7 +914,7 @@ function tickFurnaces(dt) {
 function maybeSpawnAnimals(c) {
   const r = mulberry32(c.cx * 73856093 ^ c.cz * 19349663 ^ game.seed);
   if (r() > 0.12) return;
-  const type = ['pig', 'cow', 'sheep', 'pig', 'sheep'][Math.floor(r() * 5)];
+  const type = ['pig', 'cow', 'sheep', 'chicken', 'sheep', 'pig'][Math.floor(r() * 6)];
   const n = 2 + Math.floor(r() * 3); const w = game.world;
   for (let i = 0; i < n; i++) {
     const x = c.cx * CS + Math.floor(r() * 16), z = c.cz * CS + Math.floor(r() * 16);
@@ -785,7 +926,8 @@ function maybeSpawnAnimals(c) {
 let spawnT = 0;
 function tickSpawning(dt) {
   spawnT -= dt; if (spawnT > 0) return; spawnT = 1;
-  const w = game.world; if (w.type === 'nether') { tickNetherSpawning(); return; } if (game.world.type === 'flat' && game.difficulty === 0) return;
+  const w = game.world; if (w.type === 'nether') { tickNetherSpawning(); return; } if (w.type === 'end') { tickEndSpawning(); return; }
+  tickStrongholdSpawners(); if (game.world.type === 'flat' && game.difficulty === 0) return;
   const hostile = ents.mobs.filter((m) => m.def.hostile).length;
   const cap = [0, 4, 8, 12][game.difficulty];
   if (hostile < cap) {
@@ -804,7 +946,7 @@ function tickSpawning(dt) {
       let lit = false;
       for (let dx = -6; dx <= 6 && !lit; dx += 1) for (let dy = -3; dy <= 3 && !lit; dy++) for (let dz = -6; dz <= 6; dz++) if (EMIT[w.getBlock(x + dx, y + dy, z + dz)]) { lit = true; break; }
       if (lit) continue;
-      const r = Math.random(); const type = r < 0.45 ? 'zombie' : r < 0.75 ? 'creeper' : 'skeleton';
+      const r = Math.random(); const type = r < 0.42 ? 'zombie' : r < 0.7 ? 'creeper' : r < 0.93 ? 'skeleton' : 'enderman';
       ents.spawnMob(type, x + 0.5, y, z + 0.5); break;
     }
   }
@@ -812,7 +954,7 @@ function tickSpawning(dt) {
   if (passive < 10 && game.daylight > 0.6 && Math.random() < 0.08 && game.world.type !== 'flat') {
     const ang = Math.random() * Math.PI * 2, d = 26 + Math.random() * 20;
     const x = Math.floor(player.x + Math.cos(ang) * d), z = Math.floor(player.z + Math.sin(ang) * d);
-    if (w.isLoaded(x, z)) { const y = w.topSolid(x, z); if (w.getBlock(x, y, z) === B.GRASS) { const t = ['pig', 'cow', 'sheep'][Math.floor(Math.random() * 3)]; for (let i = 0; i < 2; i++) ents.spawnMob(t, x + 0.5 + i, y + 1, z + 0.5); } }
+    if (w.isLoaded(x, z)) { const y = w.topSolid(x, z); if (w.getBlock(x, y, z) === B.GRASS || w.getBlock(x, y, z) === B.SNOW_GRASS) { const bio = w.column(x, z).biome; const wolfy = (bio === 1 || bio === 3) && Math.random() < 0.3; const t = wolfy ? 'wolf' : ['pig', 'cow', 'sheep', 'chicken'][Math.floor(Math.random() * 4)]; for (let i = 0; i < (wolfy ? 3 : 2); i++) ents.spawnMob(t, x + 0.5 + i, y + 1, z + 0.5); } }
   }
 }
 
@@ -948,6 +1090,35 @@ function useAt(sx, sy) {
       if (player.sneaking && !c.ai) { vehicles.remove(c); if (game.mode === 'survival') { const left = game.inv.add(I.CAR, 1); if (left) game.dropFromPlayer(I.CAR, 1); } toast('Picked up the car'); return; }
       enterCar(c); return;
     } }
+  if (held && held.id === I.BOW) { shootBow(); return; }
+  if (held && held.id === I.ELYTRA) { if (player.elytra) { const o = player.elytra; game.inv.slots[game.inv.sel] = { id: I.ELYTRA, count: 1, dur: o.dur, ench: o.ench }; } else game.inv.slots[game.inv.sel] = null; player.elytra = { dur: held.dur ?? maxDur(I.ELYTRA), ench: held.ench }; game.inv.onChange(); sfx.place(B.WOOL); setElytraBtn(); toast('Elytra equipped. Jump, then tap jump again in mid-air to glide', 3200); return; }
+  if (held && held.id === I.FIREWORK) {
+    if (player.gliding) { player.boostT = 1.6; sfx.firework(); if (game.mode === 'survival') game.inv.consumeHeld(1); return; }
+    if (p.block) { const b = p.block; const x = b.x + 0.5, z = b.z + 0.5, y = b.y + 1; sfx.firework(); if (game.mode === 'survival') game.inv.consumeHeld(1); swing();
+      const col = [[1, 0.3, 0.3], [0.3, 0.6, 1], [1, 0.9, 0.3], [0.5, 1, 0.4], [1, 0.4, 1]][Math.floor(Math.random() * 5)];
+      for (let i = 0; i < 8; i++) setTimeout(() => ents.burst(x, y + i * 1.6, z, [1, 0.8, 0.4], 2, 0.3, 0.06, 0.5), i * 90);
+      setTimeout(() => { ents.burst(x, y + 13, z, col, 60, 7, 0.14, 1.4); sfx.firework(); }, 800); }
+    return;
+  }
+  if (held && held.id === I.ENDER_PEARL) {
+    const d = p.d; const h = w.raycast(p.o.x, p.o.y, p.o.z, d.x, d.y, d.z, 40, (id) => id !== 0 && !LIQUID[id]);
+    if (!h) { toast('Too far to throw'); return; }
+    if (game.mode === 'survival') game.inv.consumeHeld(1); swing(); sfx.ender();
+    const tx = h.x + h.nx + 0.5, tz = h.z + h.nz + 0.5; let ty = h.y + (h.ny === 1 ? 1 : h.ny); if (h.ny === 0) { while (ty > 1 && !SOLID[w.getBlock(Math.floor(tx), ty - 1, Math.floor(tz))]) ty--; }
+    setTimeout(() => { teleportPlayer(tx, ty + 0.01, tz); if (game.mode === 'survival') { player.hurtCd = 0; game.damagePlayer(2, undefined, undefined, 'fall'); } }, 250); return;
+  }
+  if (held && held.id === I.EGG && !p.mob) {
+    if (game.mode === 'survival') game.inv.consumeHeld(1); swing(); const b = p.block;
+    const x = b ? b.x + b.nx + 0.5 : p.o.x + p.d.x * 8, y = b ? b.y + b.ny + 0.1 : p.o.y + p.d.y * 8, z = b ? b.z + b.nz + 0.5 : p.o.z + p.d.z * 8;
+    ents.burst(x, y + 0.3, z, [0.95, 0.9, 0.75], 10, 2, 0.08);
+    if (b && Math.random() < 0.125) { const m = ents.spawnMob('chicken', x, y, z, { baby: true }); if (m) { m.baby = true; m.growT = 600; } toast('A chick hatched'); }
+    return;
+  }
+  if (held && held.id === I.EYE_OF_ENDER && !(p.block && p.block.id === B.END_FRAME)) { throwEye(); return; }
+  if (held && held.id === I.EYE_OF_ENDER && p.block && p.block.id === B.END_FRAME) {
+    const b = p.block; const meta = w.getMeta ? w.getMeta(b.x, b.y, b.z) : 0; game.setBlock(b.x, b.y, b.z, B.END_FRAME_EYE, meta); sfx.eye(); swing();
+    if (game.mode === 'survival') game.inv.consumeHeld(1); checkEndPortal(b.x, b.y, b.z); return;
+  }
   if (held && held.id === I.SMARTPHONE && !p.mob) { swing(); tech.phone(); return; }
   if (held && held.id === I.DRONE && !p.mob) { swing(); game.droneView = !game.droneView; toast(game.droneView ? 'Drone camera on — use the drone again to land' : 'Drone landed'); return; }
   if (held && held.id === I.CAR && p.block && game.dim === 'overworld') {
@@ -957,6 +1128,13 @@ function useAt(sx, sy) {
   }
   if (p.mob) {
     const m = p.mob;
+    if (held && held.id === I.BONE && m.type === 'wolf' && !m.owner && !m.dead) {
+      if (game.mode === 'survival') game.inv.consumeHeld(1); swing();
+      if (Math.random() < 0.34) { m.owner = true; m.angry = 0; m.hp = m.maxHp = 20; if (m.model.g.userData.collar) m.model.g.userData.collar.visible = true; ents.hearts(m.x, m.y + m.h, m.z, 8); sfx.heart(); toast('Wolf tamed. It will follow you and fight for you'); }
+      else ents.smoke(m.x, m.y + m.h, m.z, 6);
+      return;
+    }
+    if (m.owner && m.type === 'wolf' && player.sneaking) { m.sitting = !m.sitting; toast(m.sitting ? 'Wolf is sitting' : 'Wolf is following'); return; }
     // feeding / breeding
     if (held && BREED_FOOD[m.type] === held.id && !m.baby && !m.dead) {
       if (m.breedCd > 0 && !m.def.villager) { toast('Not ready to breed yet'); return; }
@@ -976,7 +1154,7 @@ function useAt(sx, sy) {
   // food
   if (held && ITEMS[held.id] && ITEMS[held.id].food && game.mode === 'survival' && player.food < 20) {
     player.food = Math.min(20, player.food + ITEMS[held.id].food); player.sat = Math.min(player.food, player.sat + ITEMS[held.id].food * 0.6);
-    game.inv.consumeHeld(1); sfx.eat(); setTimeout(() => sfx.burp(), 520); swing(); eatT = 0.5; return;
+    const ate = held.id; game.inv.consumeHeld(1); sfx.eat(); setTimeout(() => sfx.burp(), 520); swing(); eatT = 0.5; if (ate === I.CHORUS_FRUIT) setTimeout(chorusTeleport, 300); return;
   }
   // buckets
   if (held && (held.id === I.BUCKET)) {
@@ -1098,7 +1276,7 @@ function runCommand(v) {
   if (!v.startsWith('/')) { chatLog('<Steve> ' + v); return; }
   const [cmd, ...a] = v.slice(1).split(/\s+/);
   const c = cmd.toLowerCase();
-  if (c === 'help') chatLog('Commands: /gamemode s|c, /time set day|night|noon|midnight, /weather clear|rain, /give <item> [n], /tp x y z, /summon pig|cow|sheep|villager|iron_golem|zombie|creeper|skeleton|zombified_piglin|ghast|blaze|magma_cube|tnt, /locate village|city|windfarm|fortress, /car [bus|police|taxi], /phone, /dim nether|overworld, /enchant <name> [level], /difficulty 0-3, /kill, /seed, /spawnpoint, /heal');
+  if (c === 'help') chatLog('Commands: /gamemode s|c, /time set day|night|noon|midnight, /weather clear|rain, /give <item> [n], /tp x y z, /summon pig|cow|sheep|chicken|wolf|cat|villager|iron_golem|zombie|creeper|skeleton|enderman|zombified_piglin|ghast|blaze|magma_cube|ender_dragon|tnt, /locate village|town|city|windfarm|stronghold|fortress|end_city, /car [bus|police|taxi], /phone, /dim nether|end|overworld, /enchant <name> [level], /difficulty 0-3, /kill, /seed, /spawnpoint, /heal');
   else if (c === 'gamemode' || c === 'gm') { const m = (a[0] || '').toLowerCase(); setMode(m.startsWith('c') || m === '1' ? 'creative' : 'survival'); chatLog('Game mode set to ' + game.mode); }
   else if (c === 'time') { const t = (a[1] || a[0] || '').toLowerCase(); const map = { day: 1000, noon: 6000, sunset: 12000, night: 13500, midnight: 18000, sunrise: 23000 }; const base = Math.floor(game.ticks / 24000) * 24000; const n = map[t] ?? parseInt(t, 10); if (!isNaN(n)) { game.ticks = base + n; chatLog('Set the time to ' + t); } }
   else if (c === 'weather') { game.raining = (a[0] || '') === 'rain' || (a[0] || '') === 'thunder'; game.rainT = 600; chatLog('Weather: ' + (game.raining ? 'rain' : 'clear')); }
@@ -1109,9 +1287,9 @@ function runCommand(v) {
     const n = Math.max(1, Math.min(640, parseInt(a[1] || '1', 10) || 1)); const left = game.inv.add(id, n); chatLog(`Gave ${n - left} ${itemName(id)}`);
   }
   else if (c === 'tp') { const [x, y, z] = a.map((s, i) => s.startsWith('~') ? [player.x, player.y, player.z][i] + (parseFloat(s.slice(1)) || 0) : parseFloat(s)); if ([x, y, z].every((q) => !isNaN(q))) { player.x = x; player.y = y; player.z = z; player.vy = 0; chatLog(`Teleported to ${x.toFixed(1)}, ${y.toFixed(1)}, ${z.toFixed(1)}`); } }
-  else if (c === 'summon') { const t = (a[0] || '').toLowerCase(); if (t === 'tnt') { ents.primeTNT(Math.floor(player.x - Math.sin(player.yaw) * 3), Math.floor(player.y), Math.floor(player.z - Math.cos(player.yaw) * 3)); chatLog('Summoned TNT'); } else if (MOBS[t]) { const fx = -Math.sin(player.yaw) * 3, fz = -Math.cos(player.yaw) * 3; ents.spawnMob(t, player.x + fx, player.y + 0.5, player.z + fz); chatLog('Summoned ' + t); } else chatLog('Unknown mob'); }
+  else if (c === 'summon') { const t = (a[0] || '').toLowerCase(); if (t === 'tnt') { ents.primeTNT(Math.floor(player.x - Math.sin(player.yaw) * 3), Math.floor(player.y), Math.floor(player.z - Math.cos(player.yaw) * 3)); chatLog('Summoned TNT'); } else if (MOBS[t]) { const fx = -Math.sin(player.yaw) * 3, fz = -Math.cos(player.yaw) * 3; ents.spawnMob(t, player.x + fx, player.y + 0.5, player.z + fz); if (t === 'ender_dragon') ents.endCenter = ents.endCenter || { x: player.x, y: player.y, z: player.z }; chatLog('Summoned ' + t); } else chatLog('Unknown mob'); }
   else if (c === 'dim' || c === 'dimension') {
-    const t = (a[0] || '').toLowerCase(); const target = t.startsWith('n') ? 'nether' : 'overworld';
+    const t = (a[0] || '').toLowerCase(); const target = t.startsWith('n') ? 'nether' : t.startsWith('e') || t.includes('end') ? 'end' : 'overworld';
     if (target === game.dim) chatLog('Already in the ' + target); else { chatLog('Travelling to the ' + target); switchDim(target); }
   }
   else if (c === 'enchant') {
@@ -1120,14 +1298,22 @@ function runCommand(v) {
     else if (!e || !e.on.includes(enchKind(h.id))) chatLog('Enchantments: ' + Object.keys(ENCH).join(', '));
     else { const lv = Math.max(1, Math.min(e.max, parseInt(a[1] || '1', 10) || 1)); h.ench = { ...(h.ench || {}), [key]: lv }; if (e.excl) delete h.ench[e.excl]; game.inv.onChange(); chatLog('Enchanted with ' + enchText({ [key]: lv })); }
   }
+  else if (c === 'locate' && /^(stronghold|sh)/.test((a[0] || '').toLowerCase())) {
+    if (game.dim !== 'overworld') chatLog('Strongholds are found in the Overworld');
+    else { const f = strongholdNear(game.world, player.x, player.z); if (!f) chatLog('No stronghold nearby'); else chatLog(`Stronghold portal room at ${f.portal.x}, ${f.portal.y + 1}, ${f.portal.z} (${Math.round(Math.hypot(f.portal.x - player.x, f.portal.z - player.z))} blocks). Try /tp ${f.portal.x} ${f.portal.y + 1} ${f.portal.z - 4}`); }
+  }
+  else if (c === 'locate' && /^end/.test((a[0] || '').toLowerCase())) {
+    if (game.dim !== 'end') chatLog('End cities are found in the outer End islands');
+    else { const f = endCityNear(game.world, player.x, player.z); if (!f) chatLog('No end city nearby'); else chatLog(`End city at ${f.x}, ${f.y}, ${f.z} (${Math.round(Math.hypot(f.x - player.x, f.z - player.z))} blocks). Try /tp ${f.x} ${f.y + 2} ${f.z + 6}`); }
+  }
   else if (c === 'locate' && (a[0] || '').toLowerCase().includes('fort')) {
     if (game.world.type !== 'nether') chatLog('Fortresses are found in the Nether');
     else { const f = fortressNear(game.world, player.x, player.z); if (!f) chatLog('No fortress nearby'); else chatLog(`Nether fortress at ${f.x}, ${f.y + 1}, ${f.z} (${Math.round(Math.hypot(f.x - player.x, f.z - player.z))} blocks). Try /tp ${f.x} ${f.y + 1} ${f.z}`); }
   }
   else if (c === 'locate') {
-    if (!game.world.settle) { chatLog('There are no villages in the Nether'); return; }
-    const t = (a[0] || 'village').toLowerCase().replace(/^minecraft:/, ''); const type = t.startsWith('c') ? 'city' : (t.startsWith('w') || t.startsWith('e')) ? 'energy' : 'village';
-    const p = game.world.settle.nearest(type, player.x, player.z, 14);
+    if (!game.world.settle) { chatLog('There are no villages in this dimension'); return; }
+    const t = (a[0] || 'village').toLowerCase().replace(/^minecraft:/, ''); const town = t.startsWith('t'); const type = t.startsWith('c') || town ? 'city' : (t.startsWith('w') || t.startsWith('e')) ? 'energy' : 'village';
+    const p = town ? game.world.settle.nearest('city', player.x, player.z, 14, (q) => q.town) : game.world.settle.nearest(type, player.x, player.z, 14, (q) => type !== 'city' || !q.town);
     if (!p) chatLog('Could not find a ' + type + ' nearby');
     else { const d = Math.round(Math.hypot(p.x - player.x, p.z - player.z)); chatLog(`${type === 'village' ? 'Village of ' + p.name : p.name} is at ${p.x}, ${p.y + 2}, ${p.z} (${d} blocks away). Try /tp ${p.x} ${p.y + 2} ${p.z}`); }
   }
@@ -1153,6 +1339,7 @@ function pause() { if (game.state !== 'playing') return; game.paused = true; $('
 function resume() { game.paused = false; $('pause').classList.add('hidden'); }
 function updateTimeBtn() { $('btn-time').textContent = game.daylight > 0.5 ? 'Set Night' : 'Set Day'; }
 $('btn-pause').addEventListener('pointerdown', (e) => { e.stopPropagation(); pause(); });
+$('btn-elytra').addEventListener('pointerdown', (e) => { e.stopPropagation(); if (!player.elytra) return; if (player.gliding) { player.gliding = false; return; } const o = player.elytra; const left = game.inv.add(I.ELYTRA, 1, o.dur, o.ench); if (left) game.dropFromPlayer(I.ELYTRA, 1, o.dur, o.ench); player.elytra = null; setElytraBtn(); toast('Elytra removed'); });
 $('btn-exit-car').addEventListener('pointerdown', (e) => { e.stopPropagation(); exitCar(); });
 $('btn-horn').addEventListener('pointerdown', (e) => { e.stopPropagation(); initAudio(); sfx.horn(); });
 for (const id of ['device', 'car-hud', 'waypoint']) for (const ev of ['pointerdown', 'touchstart']) $(id).addEventListener(ev, (e) => e.stopPropagation(), { passive: true });
@@ -1258,8 +1445,20 @@ function updatePlayer(dt) {
     if (jump) p.vy = Math.min(p.vy + 30 * dt, 3.6);
     p.vy = Math.max(p.vy, -3);
     if (p.fallStart !== null) p.fallStart = null;
+  } else if (p.gliding) {
+    const cp = Math.cos(p.pitch); const lx = -Math.sin(p.yaw) * cp, lz = -Math.cos(p.yaw) * cp, ly = Math.sin(p.pitch);
+    let gs = p.glideSpeed; gs += (-ly * 16 - gs * 0.08) * dt; if (p.boostT > 0) { p.boostT -= dt; gs += (30 - gs) * Math.min(1, dt * 3); if (Math.random() < dt * 30) ents.burst(p.x, p.y + 0.4, p.z, [1, 0.8, 0.5], 1, 0.4, 0.08, 0.4); }
+    gs = Math.max(0, Math.min(gs, 40)); p.glideSpeed = gs;
+    const stall = Math.max(0, 1 - gs / 6);
+    p.vx += (lx * gs - p.vx) * Math.min(1, dt * 4); p.vz += (lz * gs - p.vz) * Math.min(1, dt * 4);
+    const tvy = ly * gs - 1.2 - stall * 10; p.vy += (tvy - p.vy) * Math.min(1, dt * 3);
+    p.glideDurT = (p.glideDurT || 0) + dt; if (p.glideDurT > 1 && game.mode === 'survival' && p.elytra) { p.glideDurT = 0; p.elytra.dur = (p.elytra.dur ?? 432) - (enchLevel(p.elytra, 'unbreaking') && Math.random() < 0.5 ? 0 : 1); if (p.elytra.dur <= 1) { p.gliding = false; toast('Your elytra is broken. Repair it with phantom... or craft a new one'); } }
+    p.fallStart = null;
+    if (jump && !p._jumpPrev && p.glideT > 0.4) p.gliding = false;
+    p.glideT = (p.glideT || 0) + dt;
   } else {
     p.vy -= 28 * dt; p.vy = Math.max(p.vy, -60);
+    if (jump && !p._jumpPrev && !p.onGround && p.elytra && (p.elytra.dur ?? 2) > 1 && p.vy < 4 && !p.riding) { p.gliding = true; p.glideT = 0; p.glideSpeed = Math.max(6, Math.hypot(p.vx, p.vz, p.vy)); sfx.ender && sfx.place(B.WOOL); }
     if (jump && p.onGround) { p.vy = 8.4; p.exh += p.sprinting ? 0.2 : 0.05; if (p.sprinting) { p.vx += -sy * 2; p.vz += -cy * 2; } }
   }
   // sneak edge guard
@@ -1278,6 +1477,11 @@ function updatePlayer(dt) {
     if (!SOLID[w.getBlock(fx, fy + 1, fz)] && !SOLID[w.getBlock(fx, fy + 2, fz)] && !SOLID[w.getBlock(Math.floor(p.x), fy + 2, Math.floor(p.z))]) p.vy = 8.4;
   }
   if ((hit.hitX || hit.hitZ) && p.inWater && jump) p.vy = 5;
+  if (p.gliding) {
+    if ((hit.hitX || hit.hitZ) && p.glideSpeed > 12 && game.mode === 'survival') { p.hurtCd = 0; game.damagePlayer(Math.floor((p.glideSpeed - 10) * 0.5), undefined, undefined, 'kinetic'); p.glideSpeed *= 0.3; }
+    if (p.onGround || p.inWater || p.inLava || p.flying) { p.gliding = false; p.boostT = 0; }
+  }
+  p._jumpPrev = jump;
   // fall damage
   if (!p.onGround && !p.flying && !p.inWater) { if (p.fallStart === null || p.y > p.fallStart) p.fallStart = Math.max(p.fallStart ?? p.y, p.y); }
   if (p.onGround && !wasGround) {
@@ -1291,6 +1495,17 @@ function updatePlayer(dt) {
   if (p.onGround && !p.flying) { p.stepDist += hs; p.bob += hs * 2.2; stepAcc += hs; if (stepAcc > 1.7) { stepAcc = 0; sfx.step(w.getBlock(Math.floor(p.x), Math.floor(p.y - 0.5), Math.floor(p.z))); } }
   if (game.mode === 'survival') p.exh += hs * (p.sprinting ? 0.1 : 0.0) + (p.inWater ? hs * 0.01 : 0);
   void oy;
+  // end portal
+  if (collidesId(w, p, B.END_PORTAL) && !p.portalCd) {
+    portalFx.style.opacity = 0;
+    if (game.dim === 'overworld' || game.dim === 'nether') { switchDim('end'); return; }
+    if (game.dim === 'end') {
+      const r = Math.hypot(p.x, p.z);
+      if (r < 20) { switchDim('overworld', { fromEnd: true }); return; }
+      if (r < 200) { switchDim('end', { outer: true }); return; }
+      switchDim('end', {}); return;
+    }
+  }
   // nether portal
   if (collidesId(w, p, B.PORTAL)) {
     if (!p.portalCd) {
@@ -1384,7 +1599,14 @@ function updateSky(dt, camPos) {
     scene.background = nf; uniforms.ambCol.value.setRGB(0.34 + settings.bright * 0.12, 0.2 + settings.bright * 0.08, 0.17 + settings.bright * 0.06);
     uniforms.skyTint.value.setRGB(1, 1, 1);
   }
-  skyGroup.visible = !nether; clouds.visible = !!settings.clouds && !nether;
+  const isEnd = game.world && game.world.type === 'end';
+  if (isEnd) {
+    const ef = new THREE.Color(0x150e1e); game.daylight = 0.35; uniforms.daylight.value = 0;
+    uniforms.fogColor.value.copy(ef); uniforms.fogNear.value = settings.rd * CS * 0.35; uniforms.fogFar.value = settings.rd * CS * 0.95;
+    scene.background = ef; uniforms.ambCol.value.setRGB(0.42 + settings.bright * 0.12, 0.38 + settings.bright * 0.1, 0.5 + settings.bright * 0.12);
+    uniforms.skyTint.value.setRGB(1, 1, 1);
+  }
+  skyGroup.visible = !nether && !isEnd; clouds.visible = !!settings.clouds && !nether && !isEnd;
   skyGroup.position.copy(camPos);
   const dir = new THREE.Vector3(Math.cos(ang), Math.sin(ang), 0.15).normalize();
   sun.position.copy(dir).multiplyScalar(400); sun.lookAt(camPos); sun.visible = !game.raining;
@@ -1395,7 +1617,7 @@ function updateSky(dt, camPos) {
   sunLight.position.copy(camPos).addScaledVector(dir.y > 0 ? dir : dir.clone().negate(), 50); sunLight.target.position.copy(camPos);
   sunLight.intensity = 0.55 * dl; ambient.intensity = 0.25 + 0.6 * dl;
   handAmb.intensity = 0.35 + 0.6 * dl;
-  if (nether) { sunLight.intensity = 0.15; ambient.intensity = 0.6; handAmb.intensity = 0.7; }
+  if (nether || isEnd) { sunLight.intensity = 0.15; ambient.intensity = 0.6; handAmb.intensity = 0.7; }
   // clouds
   const size = Math.max(400, settings.rd * CS * 4); clouds.scale.set(size, size, 1);
   clouds.position.set(camPos.x, 150, camPos.z);
@@ -1404,7 +1626,7 @@ function updateSky(dt, camPos) {
   cloudU.col.value.setRGB(0.25 + 0.75 * dl, 0.25 + 0.75 * dl, 0.28 + 0.72 * dl); cloudU.fadeR.value = size / 2;
   if (game.raining) cloudU.col.value.multiplyScalar(0.7);
   // rain
-  rain.visible = game.raining && game.state === 'playing' && !nether;
+  rain.visible = game.raining && game.state === 'playing' && !nether && !isEnd;
   if (rain.visible) {
     const arr = rainGeo.attributes.position.array;
     for (let i = 0; i < RAIN_N; i++) {
@@ -1482,7 +1704,7 @@ function update(dt) {
     engineT -= dt; if (engineT < 0) { engineT = 0.11; sfx.engine(Math.abs(c.speed)); }
     if (player.dead) exitCar();
   }
-  tickSpawning(dt);
+  tickSpawning(dt); updateEyes(dt); bowCd = Math.max(0, bowCd - dt); tickEndermanStare(dt); updateBossBar();
   fluidT += dt; if (fluidT > 0.25) { fluidT = 0; tickFluids(game.fluidQ, B.WATER, 7); }
   lavaT += dt; if (lavaT > 0.9) { lavaT = 0; tickFluids(game.lavaQ, B.LAVA, 3); }
   tickFurnaces(dt);
@@ -1539,7 +1761,7 @@ window.render_game_to_text = () => JSON.stringify({
   mobs: ents ? ents.mobs.slice(0, 12).map((m) => ({ type: m.type, x: +m.x.toFixed(1), y: +m.y.toFixed(1), z: +m.z.toFixed(1), hp: m.hp })) : [],
   items: ents ? ents.items.length : 0, chunks: game.chunkMeshes.size, breaking: look ? { breaking: look.breaking, prog: +(look.prog || 0).toFixed(2) } : null,
 });
-window.__dbg = { vehicles, tech, enterCar, exitCar, player, game, pick, useAt, breakBlock, ui, runCommand, keys, settings, switchDim, tryLightPortal, countShelves, get ents() { return ents; } };
+window.__dbg = { vehicles, tech, enterCar, exitCar, player, game, pick, useAt, breakBlock, ui, runCommand, keys, settings, switchDim, tryLightPortal, countShelves, checkEndPortal, get ents() { return ents; } };
 
 // ---------- boot ----------
 hurtFlash = document.createElement('div'); hurtFlash.id = 'hurt-flash'; document.body.appendChild(hurtFlash);

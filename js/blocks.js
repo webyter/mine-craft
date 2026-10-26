@@ -17,6 +17,8 @@ export const B = {
   MARBLE: 177, SOLAR_PANEL: 178, LED_SCREEN: 179, LED_AD: 180, LED_AD2: 181, SERVER_RACK: 182, COMPUTER: 183, TV: 184,
   TRAFFIC_LIGHT: 185, AC_UNIT: 186, VENDING: 187, ATM: 188, EV_CHARGER: 189, HELIPAD: 190, ELEVATOR: 191, STEEL_POLE: 192,
   HOSPITAL_SIGN: 193, ROAD_LINE: 194, GREEN_CONCRETE: 195, ORANGE_CONCRETE: 196, PLANTER: 197,
+  END_STONE: 97, END_FRAME: 98, END_PORTAL: 99, END_FRAME_EYE: 198, PURPUR: 199, PURPUR_PILLAR: 200, END_BRICKS: 201,
+  END_ROD: 202, CHORUS_PLANT: 203, CHORUS_FLOWER: 204, DRAGON_EGG: 205, CRACKED_BRICKS: 206, MOSSY_BRICKS: 207, IRON_BARS: 208,
 };
 export const I = {
   STICK: 100, COAL: 101, IRON_INGOT: 102, GOLD_INGOT: 103, DIAMOND: 104, REDSTONE: 105, APPLE: 106,
@@ -26,6 +28,7 @@ export const I = {
   LAPIS: 150, BOOK: 151, PAPER: 152, LEATHER: 153, QUARTZ: 154, GOLD_NUGGET: 155, BLAZE_ROD: 156, BLAZE_POWDER: 157,
   GHAST_TEAR: 158, MAGMA_CREAM: 159, NETHER_BRICK: 160,
   SMARTPHONE: 300, CAR: 301, CIRCUIT: 302, BATTERY: 303, DRONE: 304,
+  EYE_OF_ENDER: 305, ENDER_PEARL: 306, ELYTRA: 307, FIREWORK: 308, BOW: 309, RAW_CHICKEN: 310, COOKED_CHICKEN: 311, EGG: 312, FEATHER: 313, CHORUS_FRUIT: 314, STRING: 315,
 };
 // tools: 130 + mat*4 + type
 export const TOOL_MATS = ['wooden', 'stone', 'iron', 'golden', 'diamond'];
@@ -172,6 +175,20 @@ def(193, { name: 'Hospital Sign', tex: 'hospital_sign', light: 12, hardness: 1, 
 def(194, { name: 'Road Marking', tex: 'road_line', hardness: 1.8, ...pk });
 def(195, { name: 'Green Concrete', tex: 'green_concrete', hardness: 1.8, ...pk });
 def(196, { name: 'Orange Concrete', tex: 'orange_concrete', hardness: 1.8, ...pk });
+def(97, { name: 'End Stone', tex: 'end_stone', hardness: 3, tool: 'pickaxe', tier: 1 });
+def(98, { name: 'End Portal Frame', tex: { top: 'frame_top', bottom: 'end_stone', side: 'frame_side' }, hardness: -1, light: 1, creative: true });
+def(99, { name: 'End Portal', tex: 'end_portal', solid: false, opaque: false, filter: 0, light: 15, hardness: -1, shape: 'slab', creative: false, drop: 0 });
+def(198, { name: 'End Portal Frame (Eye)', tex: { top: 'frame_top_eye', bottom: 'end_stone', side: 'frame_side' }, hardness: -1, light: 1, creative: false, drop: 0 });
+def(199, { name: 'Purpur Block', tex: 'purpur', hardness: 1.5, tool: 'pickaxe', tier: 1 });
+def(200, { name: 'Purpur Pillar', tex: { top: 'purpur_pillar_top', bottom: 'purpur_pillar_top', side: 'purpur_pillar' }, hardness: 1.5, tool: 'pickaxe', tier: 1 });
+def(201, { name: 'End Stone Bricks', tex: 'end_bricks', hardness: 3, tool: 'pickaxe', tier: 1 });
+def(202, { name: 'End Rod', tex: 'end_rod', solid: false, opaque: false, filter: 0, shape: 'torch', light: 14, hardness: 0 });
+def(203, { name: 'Chorus Plant', tex: 'chorus_plant', opaque: false, filter: 0, shape: 'post', hardness: 0.4, drop: I.CHORUS_FRUIT });
+def(204, { name: 'Chorus Flower', tex: 'chorus_flower', hardness: 0.4, light: 4 });
+def(205, { name: 'Dragon Egg', tex: 'dragon_egg', light: 1, hardness: 3, gravity: true });
+def(206, { name: 'Cracked Stone Bricks', tex: 'cracked_bricks', hardness: 1.5, tool: 'pickaxe', tier: 1 });
+def(207, { name: 'Mossy Stone Bricks', tex: 'mossy_bricks', hardness: 1.5, tool: 'pickaxe', tier: 1 });
+def(208, { name: 'Iron Bars', tex: 'iron_bars', opaque: false, cutout: true, filter: 0, hardness: 5, tool: 'pickaxe', tier: 1, cullSame: true });
 def(197, { name: 'Planter', tex: { top: 'grass_top', bottom: 'concrete_gray', side: 'planter_side' }, hardness: 1.5, ...pk });
 
 export const ITEMS = {};
@@ -189,6 +206,9 @@ it(I.LAPIS, 'Lapis Lazuli'); it(I.BOOK, 'Book'); it(I.PAPER, 'Paper'); it(I.LEAT
 it(I.GOLD_NUGGET, 'Gold Nugget'); it(I.BLAZE_ROD, 'Blaze Rod'); it(I.BLAZE_POWDER, 'Blaze Powder'); it(I.GHAST_TEAR, 'Ghast Tear');
 it(I.MAGMA_CREAM, 'Magma Cream'); it(I.NETHER_BRICK, 'Nether Brick');
 it(I.SMARTPHONE, 'Smartphone', { stack: 1 }); it(I.CAR, 'Electric Car', { stack: 1 }); it(I.CIRCUIT, 'Circuit Board'); it(I.BATTERY, 'Battery'); it(I.DRONE, 'Camera Drone', { stack: 1 });
+it(I.EYE_OF_ENDER, 'Eye of Ender'); it(I.ENDER_PEARL, 'Ender Pearl', { stack: 16 }); it(I.ELYTRA, 'Elytra', { stack: 1, dur: 432 });
+it(I.FIREWORK, 'Firework Rocket'); it(I.BOW, 'Bow', { stack: 1, dur: 384 }); it(I.RAW_CHICKEN, 'Raw Chicken', { food: 2 }); it(I.COOKED_CHICKEN, 'Cooked Chicken', { food: 6 });
+it(I.EGG, 'Egg', { stack: 16 }); it(I.FEATHER, 'Feather'); it(I.CHORUS_FRUIT, 'Chorus Fruit', { food: 4 }); it(I.STRING, 'String');
 it(I.BUCKET, 'Bucket', { stack: 16 }); it(I.WATER_BUCKET, 'Water Bucket', { stack: 1 }); it(I.LAVA_BUCKET, 'Lava Bucket', { stack: 1 });
 for (let m = 0; m < 5; m++) for (let t = 0; t < 4; t++) {
   const n = TOOL_MATS[m][0].toUpperCase() + TOOL_MATS[m].slice(1) + ' ' + TOOL_TYPES[t][0].toUpperCase() + TOOL_TYPES[t].slice(1);
@@ -204,8 +224,9 @@ export const maxDur = (id) => ITEMS[id] && ITEMS[id].dur ? ITEMS[id].dur : 0;
 export const CREATIVE_LIST = [
   1, 2, 3, 4, 48, 5, 6, 7, 31, 42, 8, 21, 23, 10, 9, 22, 24, 12, 19, 47, 18, 20, 13, 14, 15, 16, 17, 57, 43, 44, 45,
   74, 73, 93, 94, 40, 77, 78, 79, 96, 80, 84, 81, 83, 85, 86, 87, 88, 89, 91, 95, 92, 29, 30, 70, 66, 67, 68, 69, 75, 76, 58, 59, 64, 65, 71, 72, 63, 41, 35, 49, 50, 51, 52, 53, 25, 26, 27, 28, 38, 46, 56, 36, 37, 32, 33, 34, 55,
-  170, 171, 172, 173, 174, 175, 176, 195, 196, 177, 194, 197, 178, 179, 180, 181, 182, 183, 184, 185, 186, 187, 188, 189, 190, 191, 192, 193,
+  97, 201, 199, 200, 202, 203, 204, 205, 98, 30, 206, 207, 208, 170, 171, 172, 173, 174, 175, 176, 195, 196, 177, 194, 197, 178, 179, 180, 181, 182, 183, 184, 185, 186, 187, 188, 189, 190, 191, 192, 193,
   I.SMARTPHONE, I.CAR, I.DRONE, I.CIRCUIT, I.BATTERY,
+  I.EYE_OF_ENDER, I.ENDER_PEARL, I.ELYTRA, I.FIREWORK, I.BOW, I.ARROW, I.STRING, I.FEATHER, I.EGG, I.RAW_CHICKEN, I.COOKED_CHICKEN, I.CHORUS_FRUIT,
   I.STICK, I.COAL, I.EMERALD, I.LAPIS, I.BOOK, I.PAPER, I.LEATHER, I.QUARTZ, I.GOLD_NUGGET, I.BLAZE_ROD, I.BLAZE_POWDER, I.GHAST_TEAR, I.MAGMA_CREAM, I.NETHER_BRICK, I.SEEDS, I.WHEAT, I.HOE, I.IRON_INGOT, I.GOLD_INGOT, I.DIAMOND, I.REDSTONE, I.FLINT, I.FLINT_STEEL, I.BUCKET, I.WATER_BUCKET, I.LAVA_BUCKET, I.GUNPOWDER, I.BONE,
   I.APPLE, I.BREAD, I.RAW_PORK, I.COOKED_PORK, I.RAW_BEEF, I.STEAK, I.RAW_MUTTON, I.COOKED_MUTTON, I.ROTTEN_FLESH,
   ...[0, 1, 2, 3, 4].flatMap((m) => [0, 1, 2, 3].map((t) => toolId(m, t))),
@@ -292,6 +313,17 @@ shapeless([4, 2, 1], 197, 2);
 shaped(['SGS', 'SCS', 'KXK'], { S, G: 12, C, K: 57, X: I.BATTERY }, I.CAR);
 shaped([' S ', 'SCS', ' B '], { S, C, B: I.BATTERY }, I.DRONE);
 }
+shapeless([I.BLAZE_POWDER, I.ENDER_PEARL], I.EYE_OF_ENDER);
+shapeless([I.PAPER, I.GUNPOWDER], I.FIREWORK, 3);
+shaped([' SW', 'S W', ' SW'], { S: I.STICK, W: I.STRING }, I.BOW);
+shaped(['F', 'S', 'E'], { F: I.FLINT, S: I.STICK, E: I.FEATHER }, I.ARROW, 4);
+shapeless([35], I.STRING, 4);
+shaped(['EE', 'EE'], { E: 97 }, 201, 4);
+shaped(['FF', 'FF'], { F: I.CHORUS_FRUIT }, 199, 4);
+shaped(['P', 'P'], { P: 199 }, 200);
+shaped(['B', 'F'], { B: I.BLAZE_ROD, F: I.CHORUS_FRUIT }, 202, 4);
+shaped(['III', 'III'], { I: I.IRON_INGOT }, 208, 16);
+shapeless([30, 9], 207);
 const MATS = [10, 4, I.IRON_INGOT, I.GOLD_INGOT, I.DIAMOND];
 for (let m = 0; m < 5; m++) {
   const k = { M: MATS[m], S: I.STICK };
@@ -339,7 +371,7 @@ export function matchRecipe(grid, n) {
 
 export const SMELT = {
   14: I.IRON_INGOT, 15: I.GOLD_INGOT, 6: 12, 4: 3, 73: I.EMERALD, 3: 70, [I.RAW_PORK]: I.COOKED_PORK, [I.RAW_BEEF]: I.STEAK,
-  [I.RAW_MUTTON]: I.COOKED_MUTTON, 42: 29, 78: I.NETHER_BRICK, 80: I.QUARTZ, 84: I.GOLD_INGOT, 93: I.LAPIS, 8: I.COAL, 21: I.COAL, 23: I.COAL, 20: 51, 13: I.COAL, 16: I.DIAMOND, 30: 3,
+  [I.RAW_MUTTON]: I.COOKED_MUTTON, [I.RAW_CHICKEN]: I.COOKED_CHICKEN, [I.CHORUS_FRUIT]: 199, 42: 29, 78: I.NETHER_BRICK, 80: I.QUARTZ, 84: I.GOLD_INGOT, 93: I.LAPIS, 8: I.COAL, 21: I.COAL, 23: I.COAL, 20: 51, 13: I.COAL, 16: I.DIAMOND, 30: 3,
 };
 // fuel: number of items smelted
 export const FUEL = { [I.BLAZE_ROD]: 12, [I.LAVA_BUCKET]: 100, 86: 1.5, [I.COAL]: 8, 64: 4, 72: 1.5, 57: 80, 10: 1.5, 8: 1.5, 21: 1.5, 23: 1.5, [I.STICK]: 0.5, 25: 1.5, 27: 1.5, 41: 1.5 };
@@ -348,8 +380,10 @@ for (const t of [0, 1, 2, 3]) FUEL[toolId(0, t)] = 1;
 // ---------- Enchantments ----------
 export const ENCH = {
   efficiency: { name: 'Efficiency', max: 5, on: ['pickaxe', 'axe', 'shovel', 'hoe'], w: 10 },
-  unbreaking: { name: 'Unbreaking', max: 3, on: ['pickaxe', 'axe', 'shovel', 'sword', 'hoe', 'flint'], w: 5 },
+  unbreaking: { name: 'Unbreaking', max: 3, on: ['pickaxe', 'axe', 'shovel', 'sword', 'hoe', 'flint', 'bow', 'elytra'], w: 5 },
   fortune: { name: 'Fortune', max: 3, on: ['pickaxe', 'axe', 'shovel'], w: 2, excl: 'silk_touch' },
+  power: { name: 'Power', max: 5, on: ['bow'], w: 10 },
+  infinity: { name: 'Infinity', max: 1, on: ['bow'], w: 1 },
   silk_touch: { name: 'Silk Touch', max: 1, on: ['pickaxe', 'axe', 'shovel'], w: 1, excl: 'fortune' },
   sharpness: { name: 'Sharpness', max: 5, on: ['sword', 'axe'], w: 10 },
   knockback: { name: 'Knockback', max: 2, on: ['sword'], w: 5 },
@@ -357,7 +391,7 @@ export const ENCH = {
   looting: { name: 'Looting', max: 3, on: ['sword'], w: 2 },
 };
 export const ROMAN = ['', 'I', 'II', 'III', 'IV', 'V'];
-export const enchKind = (id) => id === I.HOE ? 'hoe' : id === I.FLINT_STEEL ? 'flint' : isTool(id) ? toolInfo(id).type : null;
+export const enchKind = (id) => id === I.HOE ? 'hoe' : id === I.BOW ? 'bow' : id === I.ELYTRA ? 'elytra' : id === I.FLINT_STEEL ? 'flint' : isTool(id) ? toolInfo(id).type : null;
 export const enchLevel = (stack, key) => (stack && stack.ench && stack.ench[key]) || 0;
 export const enchText = (ench) => ench ? Object.entries(ench).map(([k, l]) => ENCH[k].name + (ENCH[k].max > 1 ? ' ' + ROMAN[l] : '')).join(', ') : '';
 // roll enchantments for a power level (1..30) using rnd()
