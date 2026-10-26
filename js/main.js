@@ -964,7 +964,15 @@ function update(dt) {
     if (f >= 1) {
       if (loadingTarget === 'playing') {
         // fix spawn height after terrain exists
-        const top = game.world.topSolid(Math.floor(player.spawn.x), Math.floor(player.spawn.z)); player.spawn.y = top + 1.01; player.y = player.spawn.y;
+        { const w = game.world, bx = Math.floor(player.spawn.x), bz = Math.floor(player.spawn.z); let best = null;
+          for (let r = 0; r < 24 && !best; r++) for (let dx = -r; dx <= r && !best; dx++) for (let dz = -r; dz <= r && !best; dz++) {
+            if (Math.max(Math.abs(dx), Math.abs(dz)) !== r) continue; const x = bx + dx, z = bz + dz; if (!w.isLoaded(x, z)) continue;
+            const t = w.topSolid(x, z); const id = w.getBlock(x, t, z);
+            if ([B.GRASS, B.SAND, B.SNOW_GRASS, B.DIRT, B.STONE].includes(id) && w.getBlock(x, t + 1, z) !== B.WATER) best = { x, y: t, z };
+          }
+          if (!best) best = { x: bx, y: w.topSolid(bx, bz), z: bz };
+          for (let y = best.y + 1; y < best.y + 3; y++) if (!LIQUID[w.getBlock(best.x, y, best.z)]) w.setBlock(best.x, y, best.z, 0);
+          player.spawn = { x: best.x + 0.5, y: best.y + 1.01, z: best.z + 0.5 }; Object.assign(player, { x: player.spawn.x, y: player.spawn.y, z: player.spawn.z }); }
         if (player.y < 1) player.y = 40;
         show(null); $('hud').classList.remove('hidden'); game.state = 'playing'; ui.lastStats = ''; ui.renderStats(player, game.mode); setMode(game.mode);
         // initial animals around spawn
