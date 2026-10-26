@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="theme-color" content="#1e1e1e" />
+<title>Mine Craft</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<style>
+@font-face { font-family: 'MCFont'; font-style: normal; font-weight: 400; font-display: swap; size-adjust: 125%;
+  src: url(https://fonts.gstatic.com/s/jersey10/v4/GftH7vZKsggXMf9n_J5n_5jh.woff2) format('woff2'); }
+</style>
+<link rel="stylesheet" href="./style.css" />
+<script type="importmap">
+{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js" } }
+</script>
+</head>
+<body>
+<canvas id="game"></canvas>
+
+<!-- Loading -->
+<div id="loading" class="screen dirt-bg">
+  <div class="load-box">
+    <div class="load-title">Building terrain</div>
+    <div class="load-bar"><div id="load-fill"></div></div>
+    <div id="load-text" class="muted">Generating world…</div>
+  </div>
+</div>
+
+<!-- Title -->
+<div id="title" class="screen hidden">
+  <div class="title-wrap">
+    <h1 class="logo" aria-label="Mine Craft"><span>MINE</span><span>CRAFT</span></h1>
+    <div class="splash" id="splash">Made for phones!</div>
+    <div class="menu">
+      <button class="btn btn-green" id="btn-play">Play</button>
+      <button class="btn" id="btn-settings-title">Settings</button>
+      <button class="btn" id="btn-howto">How to Play</button>
+    </div>
+    <div class="edition">Bedrock-style edition · v1.0</div>
+  </div>
+</div>
+
+<!-- Create world -->
+<div id="create" class="screen dirt-bg hidden">
+  <div class="panel create-panel">
+    <div class="panel-head"><button class="icon-btn" data-back="title" aria-label="Back">‹</button><h2>Create New World</h2><span></span></div>
+    <div class="form">
+      <label class="field"><span>World Name</span><input id="world-name" value="My World" maxlength="24" /></label>
+      <div class="field"><span>Default Game Mode</span>
+        <div class="seg" data-name="mode"><button data-v="survival" class="on">Survival</button><button data-v="creative">Creative</button></div></div>
+      <div class="field"><span>Difficulty</span>
+        <div class="seg" data-name="difficulty"><button data-v="0">Peaceful</button><button data-v="1">Easy</button><button data-v="2" class="on">Normal</button><button data-v="3">Hard</button></div></div>
+      <div class="field"><span>World Type</span>
+        <div class="seg" data-name="wtype"><button data-v="infinite" class="on">Infinite</button><button data-v="flat">Flat</button></div></div>
+      <label class="field"><span>Seed (blank = random)</span><input id="world-seed" placeholder="e.g. 12345 or any word" maxlength="32" /></label>
+      <button class="btn btn-green wide" id="btn-create">Create</button>
+    </div>
+  </div>
+</div>
+
+<!-- How to play -->
+<div id="howto" class="screen dirt-bg hidden">
+  <div class="panel howto-panel">
+    <div class="panel-head"><button class="icon-btn" data-back="title" aria-label="Back">‹</button><h2>How to Play</h2><span></span></div>
+    <div class="howto-body">
+      <div class="tip"><b>Move</b><span>Drag the joystick on the left. Push it all the way to sprint.</span></div>
+      <div class="tip"><b>Look</b><span>Drag anywhere on the right side of the screen.</span></div>
+      <div class="tip"><b>Break / Attack</b><span>Hold your finger on a block to mine it. Tap a mob to hit it.</span></div>
+      <div class="tip"><b>Place / Use</b><span>Tap a block face to place the item in your hand, open chests, tables and furnaces, or eat food.</span></div>
+      <div class="tip"><b>Jump / Fly</b><span>Tap jump. In Creative, double-tap jump to fly; use ▲ / ▼ to rise and sink.</span></div>
+      <div class="tip"><b>Sneak</b><span>Tap the sneak button to crouch so you won't fall off edges.</span></div>
+      <div class="tip"><b>Inventory</b><span>Tap ••• next to the hotbar. Tap a slot to pick up a stack, tap another to drop it. Hold to split.</span></div>
+      <div class="tip"><b>Crafting</b><span>Put materials in the 2×2 grid (or 3×3 at a Crafting Table). Logs → planks → sticks → tools.</span></div>
+      <div class="tip"><b>Commands</b><span>Tap the chat button and type /help — try /time set night, /gamemode creative, /give diamond 64.</span></div>
+      <div class="tip"><b>Keyboard</b><span>WASD move, Space jump, Shift sneak, Ctrl sprint, E inventory, T chat, 1–9 hotbar, F fly (creative). Drag to look, hold to mine, right-click to place.</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- Settings -->
+<div id="settings" class="screen dirt-bg hidden">
+  <div class="panel settings-panel">
+    <div class="panel-head"><button class="icon-btn" id="settings-back" aria-label="Back">‹</button><h2>Settings</h2><span></span></div>
+    <div class="form">
+      <label class="field range"><span>Render Distance <b id="v-rd"></b></span><input type="range" id="s-rd" min="2" max="8" step="1" /></label>
+      <label class="field range"><span>Look Sensitivity <b id="v-sens"></b></span><input type="range" id="s-sens" min="0.2" max="2.5" step="0.1" /></label>
+      <label class="field range"><span>Field of View <b id="v-fov"></b></span><input type="range" id="s-fov" min="50" max="100" step="1" /></label>
+      <label class="field range"><span>Brightness <b id="v-bright"></b></span><input type="range" id="s-bright" min="0" max="1" step="0.05" /></label>
+      <label class="field range"><span>Music <b id="v-music"></b></span><input type="range" id="s-music" min="0" max="1" step="0.05" /></label>
+      <label class="field range"><span>Sound <b id="v-sfx"></b></span><input type="range" id="s-sfx" min="0" max="1" step="0.05" /></label>
+      <label class="field range"><span>Control Size <b id="v-ctrl"></b></span><input type="range" id="s-ctrl" min="0.7" max="1.4" step="0.05" /></label>
+      <div class="field"><span>Resolution</span>
+        <div class="seg" data-name="res"><button data-v="0.75">Low</button><button data-v="1.25">Medium</button><button data-v="2">High</button></div></div>
+      <div class="field"><span>Clouds</span><div class="seg" data-name="clouds"><button data-v="1">On</button><button data-v="0">Off</button></div></div>
+      <div class="field"><span>Show FPS</span><div class="seg" data-name="fps"><button data-v="1">On</button><button data-v="0">Off</button></div></div>
+    </div>
+  </div>
+</div>
+
+<!-- HUD -->
+<div id="hud" class="hidden">
+  <div id="crosshair"></div>
+  <div id="top-left"><div id="fps" class="hidden"></div><div id="coords"></div></div>
+  <div id="top-right">
+    <button class="hud-btn" id="btn-chat" aria-label="Chat and commands"><svg viewBox="0 0 16 16"><path d="M2 3h12v8H7l-3 3v-3H2z" fill="none" stroke="currentColor" stroke-width="1.6"/></svg></button>
+    <button class="hud-btn" id="btn-pause" aria-label="Pause"><svg viewBox="0 0 16 16"><rect x="4" y="3" width="3" height="10" fill="currentColor"/><rect x="9" y="3" width="3" height="10" fill="currentColor"/></svg></button>
+  </div>
+  <div id="chat-log"></div>
+  <div id="toast"></div>
+  <div id="bottom">
+    <div id="stats">
+      <div id="hearts" class="statrow"></div>
+      <div id="bubbles" class="statrow right"></div>
+      <div id="hunger" class="statrow right"></div>
+    </div>
+    <div id="xp"><div id="xp-fill"></div><span id="xp-level"></span></div>
+    <div id="hotbar-row"><div id="hotbar"></div><button id="btn-inv" class="slot inv-btn" aria-label="Open inventory">•••</button></div>
+    <div id="item-name"></div>
+  </div>
+  <!-- touch controls -->
+  <div id="touch">
+    <div id="joy-zone"></div>
+    <div id="joy"><div id="joy-knob"></div></div>
+    <div id="right-btns">
+      <button class="tbtn" id="btn-sneak" aria-label="Sneak"><svg viewBox="0 0 16 16"><path d="M8 13 3 7h3V3h4v4h3z" fill="currentColor"/></svg></button>
+      <button class="tbtn big" id="btn-jump" aria-label="Jump"><svg viewBox="0 0 16 16"><path d="M8 3l5 6h-3v4H6V9H3z" fill="currentColor"/></svg></button>
+      <button class="tbtn hidden" id="btn-down" aria-label="Fly down"><svg viewBox="0 0 16 16"><path d="M8 13 3 6h10z" fill="currentColor"/></svg></button>
+    </div>
+  </div>
+  <div id="breakring" class="hidden"></div>
+</div>
+
+<!-- Inventory / container -->
+<div id="inv" class="screen dim hidden">
+  <div class="panel inv-panel">
+    <div class="panel-head"><span></span><h2 id="inv-title">Inventory</h2><button class="icon-btn" id="inv-close" aria-label="Close">✕</button></div>
+    <div id="inv-body"></div>
+    <div id="cursor-item"></div>
+  </div>
+</div>
+
+<!-- Pause -->
+<div id="pause" class="screen dim hidden">
+  <div class="panel pause-panel">
+    <h2>Game Paused</h2>
+    <div class="menu">
+      <button class="btn btn-green" id="btn-resume">Resume Game</button>
+      <button class="btn" id="btn-settings-pause">Settings</button>
+      <div class="row2">
+        <button class="btn" id="btn-mode">Mode: Survival</button>
+        <button class="btn" id="btn-time">Set Day</button>
+      </div>
+      <button class="btn" id="btn-quit">Quit to Title</button>
+    </div>
+    <div class="muted small" id="pause-info"></div>
+  </div>
+</div>
+
+<!-- Death -->
+<div id="death" class="screen red-bg hidden">
+  <div class="death-box">
+    <h2 class="death-title">You Died!</h2>
+    <div id="death-msg" class="muted"></div>
+    <div id="death-score"></div>
+    <div class="menu">
+      <button class="btn" id="btn-respawn">Respawn</button>
+      <button class="btn" id="btn-death-quit">Main Menu</button>
+    </div>
+  </div>
+</div>
+
+<!-- Chat -->
+<div id="chat" class="hidden">
+  <form id="chat-form"><input id="chat-input" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Type a message or /help" /><button class="btn small-btn" type="submit">Send</button><button class="btn small-btn" type="button" id="chat-close">✕</button></form>
+</div>
+
+<div id="sleep" class="hidden"></div>
+<div id="rotate-hint" class="hidden">Turn your phone sideways for the best view</div>
+
+<script type="module" src="./js/main.js"></script>
+</body>
+</html>
