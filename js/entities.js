@@ -54,10 +54,10 @@ export function blockGeometry(id, size = 1) {
   const t = BLOCKS[id].tiles; const faces = [t.side, t.side, t.top, t.bottom, t.front, t.side];
   const uv = g.attributes.uv;
   for (let f = 0; f < 6; f++) {
-    const tile = faces[f]; const col = tile % 16, row = Math.floor(tile / 16);
+    const tile = faces[f]; const col = tile % 32, row = Math.floor(tile / 32);
     for (let v = 0; v < 4; v++) {
       const i = f * 4 + v; const u0 = uv.getX(i), v0 = uv.getY(i);
-      uv.setXY(i, (col + 0.01 + u0 * 0.98) / 16, 1 - (row + 1 - (0.01 + v0 * 0.98)) / 16);
+      uv.setXY(i, (col + 0.01 + u0 * 0.98) / 32, 1 - (row + 1 - (0.01 + v0 * 0.98)) / 32);
     }
   }
   return (geoCache[k] = g);
@@ -85,6 +85,11 @@ const MOBS = {
   magma_cube: { w: 0.5, h: 1.0, hp: 8, speed: 2.4, drops: [[I.MAGMA_CREAM, 0, 1]], sound: 'slime', hostile: true, hopper: true, dmg: 4, fireImmune: true },
 };
 MOBS.zombie.burns = true;
+const MODERN = {
+  citizen: [0x3a6ab8, 0x2a2a3a, 0x2a1a10, 'tie'], tech: [0x3a3a44, 0x2a3a5a, 0x1a1a1a, 'hood'], doctor: [0x7ac8c0, 0x7ac8c0, 0x3a2a1a, 'coat'],
+  officer: [0x1a2a5a, 0x101828, 0x1a1a1a, 'cap'], worker: [0xd86a20, 0x3a4a6a, 0x3a2a1a, 'vest'], shopper: [0xd84a7a, 0x4a6aa8, 0x6a3a1a, 'glasses'],
+};
+export { MODERN };
 const BREED_FOOD = { cow: I.WHEAT, sheep: I.WHEAT, pig: I.WHEAT, villager: I.BREAD };
 export { BREED_FOOD };
 function buildModel(type, opts = {}) {
@@ -110,6 +115,21 @@ function buildModel(type, opts = {}) {
   } else if (type === 'sheep') {
     quad(0.72, 0.6, 1.0, 0, 0xf2f2f2, 0.55, 0xd8c8b8, 0.42, 0xd8c8b8, [0, 1.05, 0.6]);
     for (const s of [-1, 1]) { const e = box(0.07, 0.07, 0.02, 0x111111, mats); e.position.set(s * 0.12, 0.06, 0.2); head.add(e); }
+  } else if (type === 'villager' && MODERN[opts.prof]) {
+    const [shirt, pants, hair, extra] = MODERN[opts.prof];
+    const skinV = [0x8a5a3a, 0xc89a70, 0x6a4028, 0xe0b090][(opts.skin ?? Math.floor(Math.random() * 4)) & 3];
+    const body = box(0.5, 0.75, 0.28, shirt, mats); body.position.y = 1.12; g.add(body);
+    if (extra === 'coat') { const c = box(0.54, 0.95, 0.3, 0xf4f4f4, mats); c.position.y = 1.02; g.add(c); }
+    if (extra === 'vest') { const v = box(0.52, 0.4, 0.3, 0xd8e020, mats); v.position.y = 1.25; g.add(v); }
+    if (extra === 'tie') { const t = box(0.08, 0.5, 0.02, 0xa02020, mats); t.position.set(0, 1.2, 0.15); g.add(t); }
+    for (const s of [-1, 1]) { const l = pivot(box(0.24, 0.75, 0.24, pants, mats), s * 0.125, 0.75, 0, -0.375); g.add(l); legs.push(l); }
+    for (const s of [-1, 1]) { const a = pivot(box(0.22, 0.72, 0.22, extra === 'coat' ? 0xf4f4f4 : shirt, mats), s * 0.36, 1.48, 0, -0.34); g.add(a); arms.push(a); }
+    head = new THREE.Group(); head.position.set(0, 1.74, 0); head.add(box(0.46, 0.46, 0.46, skinV, mats)); g.add(head);
+    const hr = box(0.48, 0.12, 0.48, hair, mats); hr.position.y = 0.2; head.add(hr);
+    for (const s of [-1, 1]) { const e = box(0.08, 0.06, 0.02, 0x1a1a1a, mats); e.position.set(s * 0.1, 0.03, 0.235); head.add(e); }
+    if (extra === 'cap' || extra === 'vest') { const c = box(0.5, 0.12, 0.5, extra === 'cap' ? 0x1a2a5a : 0xe8a020, mats); c.position.y = 0.28; head.add(c); const v = box(0.4, 0.04, 0.14, extra === 'cap' ? 0x101828 : 0xe8a020, mats); v.position.set(0, 0.24, 0.3); head.add(v); }
+    if (extra === 'hood') { const h = box(0.52, 0.5, 0.2, shirt, mats); h.position.set(0, 0.02, -0.2); head.add(h); }
+    if (extra === 'glasses') { const gl = box(0.36, 0.06, 0.02, 0x101010, mats); gl.position.set(0, 0.04, 0.245); head.add(gl); }
   } else if (type === 'villager') {
     const robe = { farmer: 0x8a5a2a, librarian: 0xe8e8e0, smith: 0x2a2a2e, cleric: 0x6a2a8a, butcher: 0xeeeeee, shepherd: 0x6a4a2a, mason: 0x5a5a6a, nitwit: 0x3a8a3a }[opts.prof] ?? 0x8a5a2a;
     const skinV = 0xb88660;

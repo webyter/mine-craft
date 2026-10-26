@@ -78,6 +78,12 @@ export const sfx = {
   slime() { noise(0.15, 300, 1.2, 0.5, 'lowpass'); tone(120, 0.12, 0.2, 'sine', 0.6); },
   heart() { tone(660, 0.12, 0.12, 'sine', 1.3); tone(880, 0.16, 0.1, 'sine', 1.1, sfxGain, 0.1); },
   craft() { noise(0.1, 500, 2, 0.4); tone(660, 0.1, 0.1, 'triangle', 1, sfxGain, 0.05); },
+  horn() { tone(392, 0.32, 0.22, 'sawtooth'); tone(494, 0.32, 0.18, 'sawtooth'); },
+  ding() { tone(1318, 0.5, 0.18, 'sine'); tone(1046, 0.7, 0.14, 'sine', 1, sfxGain, 0.18); },
+  shutter() { noise(0.05, 3000, 1, 0.5); noise(0.06, 1800, 1, 0.4, 'bandpass', 0.05); },
+  pop() { tone(660, 0.08, 0.2, 'triangle', 1.6); },
+  engine(v) { if (Math.random() < 0.5) tone(55 + v * 6, 0.12, 0.05 + Math.min(0.06, v * 0.004), 'sawtooth', 1.05); },
+  plane(v) { noise(0.3, 300, 0.6, 0.08 * v, 'lowpass'); },
 };
 
 // Generative calm piano-ish music

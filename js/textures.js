@@ -2,7 +2,7 @@
 import { mulberry32 } from './noise.js';
 import { BLOCKS, I, isTool, toolInfo, isBlock } from './blocks.js';
 
-export const TILE = 16, ATLAS_TILES = 16;
+export const TILE = 16, ATLAS_TILES = 32;
 const tiles = {}; // name -> index
 let tileCount = 0;
 const atlas = document.createElement('canvas');
@@ -247,6 +247,43 @@ export function buildAtlas() {
   newTile('crimson_fungus', (P) => plant(P, () => { for (let y = 9; y < 16; y++) P.set(7, y, [230, 200, 160]); for (let x = 4; x < 12; x++) for (let y = 5; y < 9; y++) if (!(y === 5 && (x === 4 || x === 11))) P.set(x, y, vary([200, 30, 30], 0.12, P.rnd)); P.set(6, 6, [255, 200, 90]); P.set(9, 7, [255, 200, 90]); }));
   newTile('ench_top', (P) => { for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) { const e = x < 2 || y < 2 || x > 13 || y > 13; P.set(x, y, e ? vary([30, 20, 40], 0.3, P.rnd) : vary([170, 30, 40], 0.1, P.rnd)); } for (let k = 0; k < 8; k++) P.set(3 + Math.floor(P.rnd() * 10), 3 + Math.floor(P.rnd() * 10), [60, 220, 220]); });
   newTile('ench_side', (P) => { for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) { const r = P.rnd(); P.set(x, y, y < 4 ? vary([170, 30, 40], 0.1, P.rnd) : r < 0.1 ? [80, 50, 120] : vary([20, 16, 32], 0.4, P.rnd)); } for (let x = 0; x < 16; x++) P.set(x, 4, [230, 200, 120]); });
+  // ---- modern 2025 tiles ----
+  const frame = (P, c) => { for (let i = 0; i < 16; i++) { P.set(i, 0, c); P.set(i, 15, c); P.set(0, i, c); P.set(15, i, c); } };
+  const curtain = (base, hi) => (P) => { for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) { const r = (x + y * 2) % 23; P.set(x, y, r < 2 ? hi : vary(mul(base, 1 + (15 - y) * 0.012), 0.03, P.rnd)); } for (let i = 0; i < 16; i++) { P.set(i, 15, [150, 160, 170]); P.set(15, i, [150, 160, 170]); P.set(7, i, mul(base, 0.8)); } };
+  newTile('glass_blue', curtain([70, 140, 200], [190, 225, 245]));
+  newTile('glass_dark', curtain([38, 46, 58], [110, 130, 150]));
+  newTile('lit_window', (P) => { for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) P.set(x, y, vary(y > 12 ? [200, 170, 110] : [255, 226, 150], 0.05, P.rnd)); for (let i = 0; i < 16; i++) { P.set(i, 15, [150, 160, 170]); P.set(15, i, [150, 160, 170]); P.set(7, i, [210, 190, 140]); } for (let x = 2; x < 6; x++) for (let y = 9; y < 13; y++) P.set(x, y, [120, 100, 80]); });
+  newTile('steel', (P) => { for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) P.set(x, y, vary(x % 8 === 0 ? [120, 126, 134] : [168, 174, 182], 0.04, P.rnd)); frame(P, [110, 116, 124]); for (const [a, b] of [[2, 2], [13, 2], [2, 13], [13, 13]]) P.set(a, b, [90, 94, 100]); });
+  newTile('black_concrete', concrete([22, 24, 28])); newTile('blue_concrete', concrete([44, 64, 150])); newTile('red_concrete', concrete([150, 36, 34]));
+  newTile('green_concrete', concrete([84, 110, 40])); newTile('orange_concrete', concrete([226, 98, 18]));
+  newTile('marble', (P) => { P.noise([236, 234, 230], 0.03); let x = 0, y = Math.floor(P.rnd() * 16); for (let i = 0; i < 26; i++) { P.set(x, y, [180, 182, 186]); x++; y += P.rnd() < 0.5 ? 1 : -1; if (x > 15) { x = 0; y = Math.floor(P.rnd() * 16); } } });
+  newTile('solar_top', (P) => { for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) P.set(x, y, (x % 4 === 0 || y % 5 === 0) ? [180, 190, 205] : vary([26, 46, 110], 0.08, P.rnd)); frame(P, [200, 205, 210]); P.set(3, 2, [120, 160, 230]); P.set(11, 8, [120, 160, 230]); });
+  newTile('solar_side', (P) => { P.noise([170, 176, 184], 0.04); for (let x = 0; x < 16; x++) for (let y = 0; y < 8; y++) P.set(x, y, [0, 0, 0], 0); for (let x = 0; x < 16; x++) P.set(x, 8, [30, 50, 110]); });
+  const led = (pal) => (P) => { for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) { const c = pal[(Math.floor(x / 2) + Math.floor(y / 2) * 3 + Math.floor(P.rnd() * 1.4)) % pal.length]; P.set(x, y, (x % 2 && y % 2) ? mul(c, 0.6) : c); } };
+  newTile('led_screen', led([[40, 200, 255], [255, 60, 160], [255, 220, 60], [60, 255, 120], [250, 250, 255]]));
+  newTile('led_ad', led([[30, 90, 255], [60, 160, 255], [255, 255, 255], [20, 40, 160]]));
+  newTile('led_ad2', led([[255, 60, 30], [255, 160, 30], [255, 240, 120], [200, 20, 40]]));
+  newTile('rack_side', (P) => { P.noise([40, 42, 48], 0.05); for (let y = 1; y < 16; y += 3) for (let x = 1; x < 15; x++) P.set(x, y, [70, 74, 82]); frame(P, [90, 94, 100]); });
+  newTile('rack_front', (P) => { P.noise([24, 26, 30], 0.05); for (let y = 1; y < 15; y += 2) { for (let x = 2; x < 14; x++) P.set(x, y, [56, 60, 68]); P.set(3, y, P.rnd() < 0.5 ? [40, 255, 90] : [40, 140, 255]); P.set(5, y, P.rnd() < 0.3 ? [255, 160, 40] : [40, 255, 90]); } frame(P, [110, 116, 124]); });
+  newTile('pc_front', (P) => { P.clear(); for (let x = 2; x < 14; x++) for (let y = 1; y < 9; y++) P.set(x, y, (x === 2 || x === 13 || y === 1 || y === 8) ? [20, 20, 24] : vary(y < 4 ? [70, 150, 230] : [40, 110, 200], 0.08, P.rnd)); for (let x = 4; x < 9; x++) P.set(x, 3, [240, 240, 255]); for (let x = 4; x < 11; x++) P.set(x, 5, [200, 220, 255]); for (let y = 9; y < 10; y++) for (let x = 7; x < 9; x++) P.set(x, y, [30, 30, 34]); for (let x = 0; x < 16; x++) { P.set(x, 10, [150, 112, 70]); P.set(x, 11, [120, 88, 52]); } for (let y = 12; y < 16; y++) { P.set(1, y, [90, 66, 40]); P.set(14, y, [90, 66, 40]); } });
+  newTile('pc_side', (P) => { P.clear(); for (let y = 1; y < 9; y++) for (let x = 7; x < 9; x++) P.set(x, y, [24, 24, 28]); for (let x = 0; x < 16; x++) { P.set(x, 10, [150, 112, 70]); P.set(x, 11, [120, 88, 52]); } for (let y = 12; y < 16; y++) { P.set(1, y, [90, 66, 40]); P.set(14, y, [90, 66, 40]); } });
+  newTile('pc_top', (P) => { planks(P, [160, 120, 76]); for (let x = 3; x < 13; x++) for (let y = 9; y < 13; y++) P.set(x, y, (x + y) % 2 ? [40, 40, 44] : [70, 70, 76]); for (let x = 2; x < 14; x++) for (let y = 2; y < 4; y++) P.set(x, y, [24, 24, 28]); P.set(14, 11, [200, 200, 205]); });
+  newTile('tv_front', (P) => { for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) { const t = Math.sin(x * 0.5) + Math.cos(y * 0.4); P.set(x, y, t > 1 ? [255, 120, 60] : t > 0 ? [60, 160, 255] : [30, 60, 140]); } frame(P, [14, 14, 16]); for (let x = 6; x < 10; x++) P.set(x, 14, [240, 240, 240]); });
+  newTile('traffic_side', (P) => { P.noise([28, 30, 32], 0.05); for (const [y, c] of [[3, [255, 40, 30]], [8, [255, 200, 30]], [13, [40, 230, 90]]]) for (let dx = -2; dx <= 2; dx++) for (let dy = -2; dy <= 2; dy++) if (dx * dx + dy * dy < 6) P.set(8 + dx, y + dy, mul(c, dx * dx + dy * dy < 2 ? 1 : 0.7)); });
+  newTile('ac_side', (P) => { P.noise([210, 212, 214], 0.03); for (let y = 2; y < 14; y += 2) for (let x = 2; x < 14; x++) P.set(x, y, [150, 152, 156]); frame(P, [160, 162, 166]); });
+  newTile('ac_front', (P) => { P.noise([210, 212, 214], 0.03); for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) { const r = Math.hypot(x - 7.5, y - 7.5); if (r < 6.5) P.set(x, y, (Math.floor(Math.atan2(y - 7.5, x - 7.5) * 1.3 + 9) % 2) ? [60, 62, 66] : [110, 112, 118]); } frame(P, [160, 162, 166]); });
+  newTile('ac_top', (P) => { P.noise([200, 202, 206], 0.03); for (let x = 2; x < 14; x += 2) for (let y = 2; y < 14; y++) P.set(x, y, [90, 92, 96]); });
+  newTile('vend_side', (P) => { P.noise([200, 30, 40], 0.04); for (let y = 2; y < 6; y++) for (let x = 2; x < 14; x++) P.set(x, y, [255, 255, 255]); for (let x = 3; x < 13; x++) P.set(x, 4, [200, 30, 40]); });
+  newTile('vend_front', (P) => { P.noise([200, 30, 40], 0.04); for (let y = 1; y < 12; y++) for (let x = 1; x < 11; x++) P.set(x, y, [170, 220, 240]); const cols = [[255, 60, 60], [60, 120, 255], [60, 220, 90], [255, 200, 40]]; for (let r = 0; r < 4; r++) for (let x = 2; x < 10; x += 2) { P.set(x, 2 + r * 3, cols[(x + r) % 4]); P.set(x, 3 + r * 3, cols[(x + r) % 4]); } for (let y = 3; y < 9; y++) P.set(13, y, [30, 30, 34]); P.set(13, 4, [40, 255, 90]); for (let x = 2; x < 10; x++) P.set(x, 13, [20, 20, 22]); });
+  newTile('atm_side', (P) => { P.noise([120, 126, 134], 0.04); frame(P, [80, 84, 90]); });
+  newTile('atm_front', (P) => { P.noise([120, 126, 134], 0.04); for (let y = 2; y < 7; y++) for (let x = 3; x < 13; x++) P.set(x, y, [40, 140, 90]); for (let x = 4; x < 9; x++) P.set(x, 3, [200, 255, 220]); for (let r = 0; r < 3; r++) for (let c = 0; c < 3; c++) P.set(5 + c * 2, 9 + r * 2, [220, 220, 224]); for (let x = 4; x < 12; x++) P.set(x, 8, [20, 20, 20]); for (let i = 0; i < 16; i++) P.set(i, 0, [30, 90, 200]); });
+  newTile('ev_side', (P) => { P.noise([236, 238, 240], 0.03); for (let y = 2; y < 7; y++) for (let x = 4; x < 12; x++) P.set(x, y, [30, 34, 40]); for (let x = 5; x < 11; x++) P.set(x, 4, [60, 230, 120]); for (let y = 9; y < 14; y++) P.set(7, y, [20, 20, 22]); P.set(8, 12, [60, 160, 255]); for (let x = 0; x < 16; x++) P.set(x, 15, [60, 160, 255]); });
+  newTile('ev_top', (P) => { P.noise([236, 238, 240], 0.03); P.set(7, 7, [60, 160, 255]); P.set(8, 8, [60, 160, 255]); });
+  newTile('helipad', (P) => { P.noise([70, 74, 80], 0.05); for (let i = 0; i < 16; i++) for (const o of [0, 15]) { P.set(i, o, [250, 210, 40]); P.set(o, i, [250, 210, 40]); } for (let y = 4; y < 12; y++) { P.set(5, y, [255, 255, 255]); P.set(10, y, [255, 255, 255]); } for (let x = 5; x < 11; x++) P.set(x, 8, [255, 255, 255]); });
+  newTile('elevator', (P) => { P.noise([176, 182, 190], 0.03); for (let y = 1; y < 16; y++) { P.set(7, y, [80, 84, 90]); P.set(8, y, [210, 214, 220]); } frame(P, [100, 104, 110]); P.set(12, 6, [255, 200, 60]); P.set(12, 8, [255, 200, 60]); P.set(13, 5, [255, 200, 60]); P.set(11, 9, [255, 200, 60]); });
+  newTile('hospital_sign', (P) => { P.noise([245, 245, 245], 0.02); for (let a = 3; a < 13; a++) for (let b = 6; b < 10; b++) { P.set(a, b, [220, 30, 40]); P.set(b, a, [220, 30, 40]); } });
+  newTile('road_line', (P) => { P.noise([46, 46, 50], 0.22); for (let y = 0; y < 16; y++) for (let x = 6; x < 10; x++) P.set(x, y, vary([236, 236, 230], 0.04, P.rnd)); });
+  newTile('planter_side', (P) => { P.noise([120, 124, 128], 0.04); for (let x = 0; x < 16; x++) for (let y = 0; y < 3; y++) P.set(x, y, vary([70, 140, 50], 0.1, P.rnd)); });
   for (let s = 0; s < 10; s++) newTile('destroy_' + s, (P) => {
     P.clear(); const n = 2 + s * 2;
     for (let k = 0; k < n; k++) { let x = 7 + Math.floor((P.rnd() - 0.5) * (4 + s)), y = 7 + Math.floor((P.rnd() - 0.5) * (4 + s)); const len = 3 + s; for (let i = 0; i < len; i++) { P.set(x, y, [20, 20, 20], 200); x += P.rnd() < 0.5 ? 1 : -1; if (P.rnd() < 0.6) y += P.rnd() < 0.5 ? 1 : -1; } }
@@ -338,6 +375,12 @@ function blob(g, colA, colB, seed, shape = 'round') {
 function itemIcon(id) {
   const c = document.createElement('canvas'); c.width = c.height = 18; const g = c.getContext('2d');
   if (id === I.HOE) { drawMap(g, ['................', '.....hhhhh......', '.....hh..s......', '.........s......', '........s.......', '.......s........', '......s.........', '.....s..........', '....s...........', '...s............'], { h: '#8a8a8a', s: '#6b4a24' }); return c.toDataURL(); }
+  const R = (x, y, w, h, col) => { g.fillStyle = col; g.fillRect(x, y, w, h); };
+  if (id === I.SMARTPHONE) { R(5, 1, 8, 16, '#111'); R(6, 3, 6, 11, '#3a8ae8'); R(6, 3, 6, 3, '#7ac8ff'); R(7, 8, 2, 2, '#ff5a7a'); R(10, 8, 1, 2, '#5aff8a'); R(8, 15, 2, 1, '#666'); return c.toDataURL(); }
+  if (id === I.CAR) { R(2, 8, 14, 5, '#d8202a'); R(5, 4, 8, 5, '#d8202a'); R(6, 5, 3, 3, '#9ad0ff'); R(10, 5, 2, 3, '#9ad0ff'); R(3, 12, 4, 4, '#111'); R(11, 12, 4, 4, '#111'); R(4, 13, 2, 2, '#888'); R(12, 13, 2, 2, '#888'); R(15, 9, 1, 2, '#ffe080'); return c.toDataURL(); }
+  if (id === I.CIRCUIT) { R(2, 3, 14, 12, '#1a7a3a'); R(4, 5, 4, 4, '#222'); R(10, 9, 4, 4, '#222'); for (let k = 0; k < 6; k++) R(3 + k * 2, 14, 1, 2, '#e8c040'); R(8, 7, 6, 1, '#e8c040'); R(5, 10, 1, 4, '#e8c040'); return c.toDataURL(); }
+  if (id === I.BATTERY) { R(5, 3, 8, 13, '#2a2a2a'); R(7, 1, 4, 2, '#aaa'); R(5, 3, 8, 4, '#e8c040'); R(8, 9, 2, 5, '#fff'); R(7, 11, 4, 1, '#fff'); return c.toDataURL(); }
+  if (id === I.DRONE) { R(6, 7, 6, 4, '#ddd'); R(8, 11, 2, 2, '#222'); R(1, 6, 6, 1, '#555'); R(11, 6, 6, 1, '#555'); R(3, 7, 2, 2, '#888'); R(13, 7, 2, 2, '#888'); R(8, 8, 2, 1, '#3a8ae8'); return c.toDataURL(); }
   if (isTool(id)) {
     const t = toolInfo(id);
     drawMap(g, TOOL_SHAPES[t.type], { h: t.color, s: '#6b4a24', g: t.dark });

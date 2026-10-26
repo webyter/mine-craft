@@ -8,6 +8,8 @@ import { World, initTables, CS, H, SEA, SOLID, LIQUID, OPAQUE, EMIT, ckey } from
 import { EntityManager, moveEntity, collides, blockGeometry, MOBS, BREED_FOOD } from './entities.js';
 import { Inventory, UI } from './ui.js';
 import { initAudio, sfx, audioSettings, setVolumes } from './audio.js';
+import { Vehicles } from './vehicles.js';
+import { Tech } from './tech.js';
 
 THREE.ColorManagement.enabled = false;
 const $ = (id) => document.getElementById(id);
@@ -45,7 +47,7 @@ const atlasTex = new THREE.CanvasTexture(atlasCanvas);
 atlasTex.magFilter = THREE.NearestFilter; atlasTex.minFilter = THREE.NearestFilter; atlasTex.generateMipmaps = false;
 // stone texture for logo & dirt backgrounds
 (function cssTextures() {
-  const mk = (name) => { const t = tileIndex(name); const c = document.createElement('canvas'); c.width = c.height = 16; c.getContext('2d').drawImage(atlasCanvas, (t % 16) * 16, Math.floor(t / 16) * 16, 16, 16, 0, 0, 16, 16); return c.toDataURL(); };
+  const mk = (name) => { const t = tileIndex(name); const c = document.createElement('canvas'); c.width = c.height = 16; c.getContext('2d').drawImage(atlasCanvas, (t % 32) * 16, Math.floor(t / 32) * 16, 16, 16, 0, 0, 16, 16); return c.toDataURL(); };
   document.documentElement.style.setProperty('--stone-tex', `url(${mk('cobblestone')})`);
   const dirt = mk('dirt'); document.querySelectorAll('.dirt-bg').forEach((e) => (e.style.backgroundImage = `url(${dirt})`));
 })();
@@ -125,8 +127,8 @@ const crackBaseUV = crackGeo.attributes.uv.array.slice();
 let crackStage = -1;
 function setCrack(stage) {
   if (stage === crackStage) return; crackStage = stage;
-  const t = tileIndex('destroy_' + stage); const col = t % 16, row = Math.floor(t / 16); const uv = crackGeo.attributes.uv;
-  for (let i = 0; i < uv.count; i++) uv.setXY(i, (col + crackBaseUV[i * 2]) / 16, 1 - (row + 1 - crackBaseUV[i * 2 + 1]) / 16);
+  const t = tileIndex('destroy_' + stage); const col = t % 32, row = Math.floor(t / 32); const uv = crackGeo.attributes.uv;
+  for (let i = 0; i < uv.count; i++) uv.setXY(i, (col + crackBaseUV[i * 2]) / 32, 1 - (row + 1 - crackBaseUV[i * 2 + 1]) / 32);
   uv.needsUpdate = true;
 }
 
@@ -167,12 +169,45 @@ const player = game.player = {
 const ui = new UI(game);
 game.ui = ui;
 let ents = null;
+// ---------- cars + tech ----------
+let planeSndT = 0, engineT = 0;
+const vehicles = new Vehicles(game, scene, {
+  controls: () => { let t = 0, s = 0; if (keys.w || keys.arrowup) t += 1; if (keys.s || keys.arrowdown) t -= 1; if (keys.a || keys.arrowleft) s -= 1; if (keys.d || keys.arrowright) s += 1; if (joy.id !== null) { t += -joy.y; s += joy.x; } if (ui.screen || game.chatOpen) t = s = 0; return { throttle: Math.max(-1, Math.min(1, t)), steer: Math.max(-1, Math.min(1, s)) }; },
+  horn: (c) => { if (Math.hypot(c.x - player.x, c.z - player.z) < 30) sfx.horn(); },
+  hurtPlayer: (d, fx, fz) => { if (game.mode !== 'survival') return; player.hurtCd = 0; game.damagePlayer(Math.round(d), player.x - fx, player.z - fz, 'car'); },
+  crash: (c, v) => { if (c === player.riding) { shake = 0.3; sfx.hit(); if (game.mode === 'survival' && v > 15) { player.hurtCd = 0; game.damagePlayer(Math.floor((v - 13) / 2), undefined, undefined, 'car'); } } },
+  nearCharger: (c) => { const w = game.world; for (let dx = -3; dx <= 3; dx++) for (let dz = -3; dz <= 3; dz++) for (let dy = -1; dy <= 1; dy++) if (w.getBlock(Math.floor(c.x) + dx, Math.floor(c.y) + dy, Math.floor(c.z) + dz) === B.EV_CHARGER) return true; return false; },
+});
+const tech = new Tech(game, scene, {
+  ui, player, vehicles, sfx, toast: (m) => toast(m), runCommand: (c) => runCommand(c),
+  snapshot: () => { try { render(0); return canvas.toDataURL('image/jpeg', 0.72); } catch (_) { return null; } },
+  planeSound: (v) => { planeSndT -= 0.016; if (planeSndT < 0) { planeSndT = 0.35; sfx.plane(v); } },
+});
+game.vehicles = vehicles; game.tech = tech;
+function enterCar(c) {
+  if (player.riding) return;
+  player.riding = c; c.ai = false; c.owned = true; c.keep = true; c.speed = 0; c.vy = 0;
+  player.flying = false; endPointer(); $('car-hud').classList.remove('hidden'); $('touch').classList.add('driving');
+  toast(c.kind === 'bus' ? 'Driving a bus' : c.kind === 'police' ? 'Driving a police car' : 'Driving — joystick up to accelerate, sideways to steer', 2600);
+}
+function exitCar() {
+  const c = player.riding; if (!c) return; player.riding = null; c.speed = 0;
+  $('car-hud').classList.add('hidden'); $('touch').classList.remove('driving');
+  const w = game.world; const rx = Math.cos(c.yaw), rz = -Math.sin(c.yaw);
+  for (const [ox, oz] of [[rx * 1.8, rz * 1.8], [-rx * 1.8, -rz * 1.8], [Math.sin(c.yaw) * 3, Math.cos(c.yaw) * 3], [-Math.sin(c.yaw) * 3, -Math.cos(c.yaw) * 3], [0, 0]]) {
+    const x = c.x + ox, z = c.z + oz; let y = c.y + 0.01;
+    if (ox === 0 && oz === 0) y = c.y + 1.8;
+    if (!collides(w, x - 0.3, y, z - 0.3, x + 0.3, y + 1.8, z + 0.3)) { player.x = x; player.y = y; player.z = z; break; }
+  }
+  player.vx = player.vy = player.vz = 0; player.fallStart = null;
+}
 
 // ---------- world lifecycle ----------
 function disposeWorld() {
   for (const [, m] of game.chunkMeshes) { if (m.solid) { scene.remove(m.solid); m.solid.geometry.dispose(); } if (m.water) { scene.remove(m.water); m.water.geometry.dispose(); } }
   game.chunkMeshes.clear(); game.fluidQ = new Map(); game.lavaQ = new Map();
   if (ents) ents.clear();
+  if (player.riding) exitCar(); vehicles.clear(); tech.reset(); if (tech.el) tech.close();
   game.dims = {}; game.dim = 'overworld';
 }
 function newWorld({ seedText = '', mode = 'survival', difficulty = 2, type = 'infinite', name = 'My World' } = {}) {
@@ -194,6 +229,7 @@ function newWorld({ seedText = '', mode = 'survival', difficulty = 2, type = 'in
     const x = Math.round(Math.cos(a / 8 * Math.PI * 2) * r), z = Math.round(Math.sin(a / 8 * Math.PI * 2) * r);
     const c = game.world.column(x, z); if (c.h > SEA && c.biome !== 5 && c.biome !== 4) { sx = x; sz = z; break outer; }
   }
+  { const st = game.world.settle; let hc = st && st.plan(0, 0); if ((!hc || hc.type !== 'city') && st && game.world.type !== 'flat') hc = st.nearest('city', 0, 0, 3); if (hc && hc.type === 'city') { const G = hc.grid; sx = G.x0 + 2 * G.P + G.RW - 1; sz = G.z0 + 2 * G.P; game.spawnCity = true; } else game.spawnCity = false; }
   game.world.ensureChunk(sx >> 4, sz >> 4);
   const top = game.world.topSolid(sx, sz);
   player.spawn = { x: sx + 0.5, y: top + 1.01, z: sz + 0.5 };
@@ -488,6 +524,7 @@ let arrival = null;
 const ENT_LISTS = ['mobs', 'items', 'tnts', 'falling', 'arrows', 'fireballs'];
 function entMesh(e) { return e.model ? e.model.g : e.mesh; }
 function switchDim(target, opts = {}) {
+  if (player.riding) exitCar();
   if (ui.screen) ui.close();
   const cur = game.dims[game.dim];
   cur.world = game.world; cur.fluidQ = game.fluidQ; cur.lavaQ = game.lavaQ; cur.ents = {};
@@ -634,7 +671,8 @@ const LOOT = {
   smith: [[I.IRON_INGOT, 1, 5, 0.9], [I.BREAD, 1, 3, 0.6], [I.COAL, 2, 6, 0.6], [I.EMERALD, 1, 3, 0.5], [toolId(2, 0), 1, 1, 0.3], [toolId(2, 3), 1, 1, 0.25], [B.OBSIDIAN, 1, 3, 0.3], [I.DIAMOND, 1, 2, 0.12]],
   library: [[I.EMERALD, 1, 3, 0.6], [B.BOOKSHELF, 1, 2, 0.4], [I.STICK, 2, 8, 0.5], [B.GLASS, 2, 5, 0.4], [B.TORCH, 2, 6, 0.5]],
   butcher: [[I.RAW_PORK, 1, 4, 0.7], [I.RAW_BEEF, 1, 4, 0.6], [I.RAW_MUTTON, 1, 3, 0.5], [I.COAL, 1, 4, 0.6], [I.EMERALD, 1, 2, 0.3]],
-  city: [[I.EMERALD, 2, 6, 0.9], [I.IRON_INGOT, 2, 6, 0.7], [I.GOLD_INGOT, 1, 4, 0.5], [I.DIAMOND, 1, 3, 0.3], [B.GLOWSTONE, 1, 4, 0.5], [I.BREAD, 2, 5, 0.6], [I.STEAK, 1, 4, 0.5]],
+  mall: [[I.EMERALD, 1, 4, 0.8], [I.SMARTPHONE, 1, 1, 0.25], [I.BATTERY, 1, 3, 0.5], [I.CIRCUIT, 1, 2, 0.4], [B.LED_SCREEN, 2, 6, 0.4], [I.BREAD, 2, 5, 0.6], [I.STEAK, 1, 4, 0.5], [B.GLASS_BLUE, 4, 12, 0.4]],
+  city: [[I.SMARTPHONE, 1, 1, 0.3], [I.CIRCUIT, 1, 3, 0.5], [I.BATTERY, 1, 2, 0.4], [I.EMERALD, 2, 6, 0.9], [I.IRON_INGOT, 2, 6, 0.7], [I.GOLD_INGOT, 1, 4, 0.5], [I.DIAMOND, 1, 3, 0.3], [B.GLOWSTONE, 1, 4, 0.5], [I.BREAD, 2, 5, 0.6], [I.STEAK, 1, 4, 0.5]],
   fortress: [[I.GOLD_INGOT, 1, 4, 0.7], [I.IRON_INGOT, 1, 5, 0.6], [I.DIAMOND, 1, 3, 0.3], [B.OBSIDIAN, 2, 6, 0.4], [I.FLINT_STEEL, 1, 1, 0.35], [I.GOLD_NUGGET, 3, 12, 0.5], [I.BLAZE_ROD, 1, 2, 0.25], [I.LAPIS, 3, 9, 0.4], [toolId(3, 3), 1, 1, 0.25]],
   shop: [[I.EMERALD, 1, 4, 0.8], [B.GLASS, 4, 12, 0.5], [B.BRICKS, 4, 12, 0.4], [B.TORCH, 4, 10, 0.5], [I.BREAD, 2, 5, 0.6], [I.COOKED_PORK, 1, 4, 0.5], [B.LAMP, 1, 3, 0.3]],
 };
@@ -689,7 +727,7 @@ function tickSettlements(dt) {
   }
   // announce arrival
   const here = w.settle.at(Math.floor(px), Math.floor(pz));
-  if (here !== game.lastSettlement) { game.lastSettlement = here; if (here) toast((here.type === 'city' ? '' : 'Village of ') + here.name, 2400); }
+  if (here !== game.lastSettlement) { game.lastSettlement = here; if (here) toast((here.type === 'village' ? 'Village of ' : '') + here.name + (here.type === 'city' ? ' — population ' + (here.mobs.length * 1250).toLocaleString() : ''), 2600); }
 }
 const TRADES = {
   farmer: [[[I.WHEAT, 20], [I.EMERALD, 1]], [[B.PUMPKIN, 6], [I.EMERALD, 1]], [[I.EMERALD, 1], [I.BREAD, 6]], [[I.EMERALD, 1], [I.APPLE, 4]], [[I.EMERALD, 1], [I.SEEDS, 12]]],
@@ -700,6 +738,12 @@ const TRADES = {
   shepherd: [[[B.WOOL, 16], [I.EMERALD, 1]], [[I.EMERALD, 1], [B.RED_WOOL, 4]], [[I.EMERALD, 1], [B.BLUE_WOOL, 4]], [[I.EMERALD, 2], [B.BED, 1]], [[I.EMERALD, 1], [B.WOOL, 8]]],
   mason: [[[B.CLAY, 10], [I.EMERALD, 1]], [[B.STONE, 20], [I.EMERALD, 1]], [[I.EMERALD, 1], [B.BRICKS, 10]], [[I.EMERALD, 1], [B.WHITE_CONCRETE, 12]], [[I.EMERALD, 1], [B.WINDOW, 8]], [[I.EMERALD, 2], [B.TERRACOTTA, 12]]],
   nitwit: [],
+  tech: [[[I.EMERALD, 6], [I.SMARTPHONE, 1]], [[I.EMERALD, 3], [I.CIRCUIT, 2]], [[I.EMERALD, 2], [I.BATTERY, 3]], [[I.EMERALD, 6], [B.COMPUTER, 1]], [[I.EMERALD, 4], [B.SOLAR_PANEL, 6]], [[I.EMERALD, 4], [B.LED_SCREEN, 4]], [[I.EMERALD, 18], [I.CAR, 1]], [[I.EMERALD, 8], [I.DRONE, 1]], [[I.REDSTONE, 12], [I.EMERALD, 1]]],
+  citizen: [[[I.EMERALD, 2], [B.GLASS_BLUE, 12]], [[I.EMERALD, 2], [B.STEEL, 8]], [[I.EMERALD, 3], [B.TV, 1]], [[I.EMERALD, 1], [B.MARBLE, 8]], [[I.STEAK, 8], [I.EMERALD, 1]], [[I.EMERALD, 2], [B.TRAFFIC_LIGHT, 2]]],
+  shopper: [[[I.EMERALD, 1], [I.BREAD, 6]], [[I.EMERALD, 2], [B.VENDING, 1]], [[I.EMERALD, 1], [B.RED_CONCRETE, 8]], [[I.EMERALD, 1], [B.BLUE_CONCRETE, 8]], [[I.GOLD_INGOT, 3], [I.EMERALD, 1]]],
+  doctor: [[[I.ROTTEN_FLESH, 20], [I.EMERALD, 1]], [[I.EMERALD, 1], [I.APPLE, 6]], [[I.EMERALD, 1], [I.BREAD, 4]], [[I.EMERALD, 2], [B.HOSPITAL_SIGN, 2]], [[I.EMERALD, 4], [B.BED, 1]]],
+  officer: [[[I.IRON_INGOT, 6], [I.EMERALD, 1]], [[I.EMERALD, 3], [toolId(2, 3), 1]], [[I.GUNPOWDER, 8], [I.EMERALD, 1]]],
+  worker: [[[I.COAL, 15], [I.EMERALD, 1]], [[I.EMERALD, 1], [B.ORANGE_CONCRETE, 10]], [[I.EMERALD, 2], [B.STEEL_POLE, 8]], [[I.EMERALD, 3], [B.EV_CHARGER, 1]], [[I.EMERALD, 2], [B.HELIPAD, 8]]],
 };
 function makeTrades(prof) { return (TRADES[prof] || []).map(([cost, out]) => ({ cost, out, uses: 0, max: 8 + Math.floor(Math.random() * 5) })); }
 game.makeTrades = makeTrades;
@@ -818,7 +862,7 @@ function endPointer(e) {
   if (look && look.id === e.pointerId) {
     const dt = performance.now() - look.t0;
     if (!look.breaking && dt < 300 && look.moved < 16 && !look.mouse) useAt(look.px, look.py);
-    if (look.mouse && !look.breaking && !look.dragging && dt < 300) attackOnly(look.px, look.py);
+    if (look && look.mouse && !look.breaking && !look.dragging && dt < 300) attackOnly(look.px, look.py);
     look = null; crack.visible = false; setCrack(0); $('breakring').classList.add('hidden');
   }
 }
@@ -895,9 +939,22 @@ function facingMeta() {
   if (Math.abs(fx) > Math.abs(fz)) return fx > 0 ? 3 : 1; return fz > 0 ? 2 : 0;
 }
 function useAt(sx, sy) {
-  if (player.dead) return;
+  if (player.dead || player.riding) return;
   const p = pick(sx, sy); const held = game.inv.held(); const w = game.world;
   if (p.fireball) { ents.deflect(p.fireball, p.d); swing(); return; }
+  { const ch = game.dim === 'overworld' ? vehicles.raycast(p.o, p.d, 6) : null;
+    if (ch && (!p.block || ch.t < p.block.t) && (!p.mob || ch.t < 99)) {
+      const c = ch.car; swing();
+      if (player.sneaking && !c.ai) { vehicles.remove(c); if (game.mode === 'survival') { const left = game.inv.add(I.CAR, 1); if (left) game.dropFromPlayer(I.CAR, 1); } toast('Picked up the car'); return; }
+      enterCar(c); return;
+    } }
+  if (held && held.id === I.SMARTPHONE && !p.mob) { swing(); tech.phone(); return; }
+  if (held && held.id === I.DRONE && !p.mob) { swing(); game.droneView = !game.droneView; toast(game.droneView ? 'Drone camera on — use the drone again to land' : 'Drone landed'); return; }
+  if (held && held.id === I.CAR && p.block && game.dim === 'overworld') {
+    const b = p.block; const x = b.x + b.nx + 0.5, z = b.z + b.nz + 0.5; const y = b.ny === 1 ? b.y + 1.01 : b.y + b.ny + 0.01;
+    if (collides(w, x - 0.9, y, z - 0.9, x + 0.9, y + 1.5, z + 0.9)) { toast('Not enough space for a car'); return; }
+    vehicles.place(x, y, z, player.yaw + Math.PI); if (game.mode === 'survival') game.inv.consumeHeld(1); sfx.place(B.IRON_BLOCK); swing(); return;
+  }
   if (p.mob) {
     const m = p.mob;
     // feeding / breeding
@@ -951,6 +1008,14 @@ function useAt(sx, sy) {
     if (tryLightPortal(b.x + b.nx, b.y + b.ny, b.z + b.nz)) { if (game.mode === 'survival') game.inv.damageHeld(1); swing(); return; }
   }
   if (!sneaking) {
+    if (bid === B.COMPUTER) { tech.computer('shop'); return; }
+    if (bid === B.ELEVATOR) { tech.elevator(b); return; }
+    if (bid === B.ATM) { tech.atm(b); return; }
+    if (bid === B.VENDING) { tech.vending(); return; }
+    if (bid === B.TV) { tech.tv(); return; }
+    if (bid === B.SERVER_RACK) { toast('Server online · 99.99% uptime · 42 TB stored'); return; }
+    if (bid === B.EV_CHARGER) { toast('Park an electric car next to a charger to recharge it'); return; }
+    if (bid === B.SOLAR_PANEL) { toast('Solar panel output: ' + (game.daylight > 0.5 && !game.raining ? Math.round(game.daylight * 400) + ' W' : '0 W')); return; }
     if (bid === B.TABLE) { ui.open('table'); return; }
     if (bid === B.ENCHANT_TABLE) { ui.open('enchant', { type: 'enchant', slots: [null, null], shelves: countShelves(b.x, b.y, b.z), x: b.x, y: b.y, z: b.z }); for (let i = 0; i < 6; i++) setTimeout(() => ents.burst(b.x + 0.5 + (Math.random() - 0.5) * 3, b.y + 1.6, b.z + 0.5 + (Math.random() - 0.5) * 3, [0.75, 0.6, 1], 2, 0.6, 0.06, 1), i * 80); return; }
     if (bid === B.FURNACE || bid === B.LIT_FURNACE) { ui.open('furnace', getTile(b.x, b.y, b.z, 'furnace')); return; }
@@ -1033,7 +1098,7 @@ function runCommand(v) {
   if (!v.startsWith('/')) { chatLog('<Steve> ' + v); return; }
   const [cmd, ...a] = v.slice(1).split(/\s+/);
   const c = cmd.toLowerCase();
-  if (c === 'help') chatLog('Commands: /gamemode s|c, /time set day|night|noon|midnight, /weather clear|rain, /give <item> [n], /tp x y z, /summon pig|cow|sheep|villager|iron_golem|zombie|creeper|skeleton|zombified_piglin|ghast|blaze|magma_cube|tnt, /locate village|city|fortress, /dim nether|overworld, /enchant <name> [level], /difficulty 0-3, /kill, /seed, /spawnpoint, /heal');
+  if (c === 'help') chatLog('Commands: /gamemode s|c, /time set day|night|noon|midnight, /weather clear|rain, /give <item> [n], /tp x y z, /summon pig|cow|sheep|villager|iron_golem|zombie|creeper|skeleton|zombified_piglin|ghast|blaze|magma_cube|tnt, /locate village|city|windfarm|fortress, /car [bus|police|taxi], /phone, /dim nether|overworld, /enchant <name> [level], /difficulty 0-3, /kill, /seed, /spawnpoint, /heal');
   else if (c === 'gamemode' || c === 'gm') { const m = (a[0] || '').toLowerCase(); setMode(m.startsWith('c') || m === '1' ? 'creative' : 'survival'); chatLog('Game mode set to ' + game.mode); }
   else if (c === 'time') { const t = (a[1] || a[0] || '').toLowerCase(); const map = { day: 1000, noon: 6000, sunset: 12000, night: 13500, midnight: 18000, sunrise: 23000 }; const base = Math.floor(game.ticks / 24000) * 24000; const n = map[t] ?? parseInt(t, 10); if (!isNaN(n)) { game.ticks = base + n; chatLog('Set the time to ' + t); } }
   else if (c === 'weather') { game.raining = (a[0] || '') === 'rain' || (a[0] || '') === 'thunder'; game.rainT = 600; chatLog('Weather: ' + (game.raining ? 'rain' : 'clear')); }
@@ -1061,11 +1126,13 @@ function runCommand(v) {
   }
   else if (c === 'locate') {
     if (!game.world.settle) { chatLog('There are no villages in the Nether'); return; }
-    const t = (a[0] || 'village').toLowerCase().replace(/^minecraft:/, ''); const type = t.startsWith('c') ? 'city' : 'village';
+    const t = (a[0] || 'village').toLowerCase().replace(/^minecraft:/, ''); const type = t.startsWith('c') ? 'city' : (t.startsWith('w') || t.startsWith('e')) ? 'energy' : 'village';
     const p = game.world.settle.nearest(type, player.x, player.z, 14);
     if (!p) chatLog('Could not find a ' + type + ' nearby');
-    else { const d = Math.round(Math.hypot(p.x - player.x, p.z - player.z)); chatLog(`${type === 'city' ? p.name : 'Village of ' + p.name} is at ${p.x}, ${p.y + 2}, ${p.z} (${d} blocks away). Try /tp ${p.x} ${p.y + 2} ${p.z}`); }
+    else { const d = Math.round(Math.hypot(p.x - player.x, p.z - player.z)); chatLog(`${type === 'village' ? 'Village of ' + p.name : p.name} is at ${p.x}, ${p.y + 2}, ${p.z} (${d} blocks away). Try /tp ${p.x} ${p.y + 2} ${p.z}`); }
   }
+  else if (c === 'car') { if (game.dim !== 'overworld') { chatLog('Cars only work in the Overworld'); return; } const fx = -Math.sin(player.yaw), fz = -Math.cos(player.yaw); const kind = ['bus', 'police', 'taxi'].includes(a[0]) ? a[0] : 'car'; vehicles.add({ x: player.x + fx * 4, y: player.y + 0.5, z: player.z + fz * 4, yaw: player.yaw + Math.PI, kind, owned: true, color: kind === 'taxi' ? 0xf0c020 : kind === 'bus' ? 0x2a7ad8 : kind === 'police' ? 0x1a2a6a : undefined }); chatLog('Spawned a ' + kind); }
+  else if (c === 'phone') { tech.phone(); }
   else if (c === 'difficulty') { const d = parseInt(a[0], 10); if (d >= 0 && d <= 3) { game.difficulty = d; chatLog('Difficulty ' + ['Peaceful', 'Easy', 'Normal', 'Hard'][d]); } }
   else if (c === 'kill') { if (game.mode === 'survival') { player.hurtCd = 0; game.damagePlayer(999, undefined, undefined, 'void'); } }
   else if (c === 'seed') chatLog('Seed: ' + game.seedText);
@@ -1086,6 +1153,9 @@ function pause() { if (game.state !== 'playing') return; game.paused = true; $('
 function resume() { game.paused = false; $('pause').classList.add('hidden'); }
 function updateTimeBtn() { $('btn-time').textContent = game.daylight > 0.5 ? 'Set Night' : 'Set Day'; }
 $('btn-pause').addEventListener('pointerdown', (e) => { e.stopPropagation(); pause(); });
+$('btn-exit-car').addEventListener('pointerdown', (e) => { e.stopPropagation(); exitCar(); });
+$('btn-horn').addEventListener('pointerdown', (e) => { e.stopPropagation(); initAudio(); sfx.horn(); });
+for (const id of ['device', 'car-hud', 'waypoint']) for (const ev of ['pointerdown', 'touchstart']) $(id).addEventListener(ev, (e) => e.stopPropagation(), { passive: true });
 $('btn-resume').onclick = resume;
 $('btn-mode').onclick = () => { setMode(game.mode === 'creative' ? 'survival' : 'creative'); };
 $('btn-time').onclick = () => { const base = Math.floor(game.ticks / 24000) * 24000; game.ticks = base + (game.daylight > 0.5 ? 13800 : 24000 + 1000); setTimeout(updateTimeBtn, 50); };
@@ -1154,6 +1224,7 @@ let stepAcc = 0;
 function updatePlayer(dt) {
   const w = game.world; const p = player;
   if (!w.isLoaded(Math.floor(p.x), Math.floor(p.z))) return; // wait for terrain
+  if (p.riding) { if (!vehicles.list.includes(p.riding)) exitCar(); else { p.yaw = p.riding.yaw + Math.PI; p.sneaking = p.sprinting = false; p.inWater = p.inLava = p.headInWater = p.headInLava = false; return; } }
   const inputBlocked = ui.screen || game.chatOpen || game.inBed;
   // input vector
   let mx = 0, mz = 0;
@@ -1254,7 +1325,7 @@ function collidesId(w, e, id) {
 }
 let breakSoundT = 0;
 function updateBreaking(dt) {
-  if (!look || ui.screen || player.dead) { crack.visible = false; return; }
+  if (!look || ui.screen || player.dead || player.riding) { crack.visible = false; return; }
   const now = performance.now();
   if (!look.breaking) {
     if (look.mouse) { if (now > look.mouseStartBreakAt && !look.dragging) look.breaking = true; }
@@ -1327,7 +1398,7 @@ function updateSky(dt, camPos) {
   if (nether) { sunLight.intensity = 0.15; ambient.intensity = 0.6; handAmb.intensity = 0.7; }
   // clouds
   const size = Math.max(400, settings.rd * CS * 4); clouds.scale.set(size, size, 1);
-  clouds.position.set(camPos.x, H + 18, camPos.z);
+  clouds.position.set(camPos.x, 150, camPos.z);
   const cell = 12 * 64; cloudU.rep.value = size / cell;
   cloudU.off.value.set(((camPos.x + game.ticks * 0.03) / cell) - cloudU.rep.value / 2, (-camPos.z / cell) - cloudU.rep.value / 2);
   cloudU.col.value.setRGB(0.25 + 0.75 * dl, 0.25 + 0.75 * dl, 0.28 + 0.72 * dl); cloudU.fadeR.value = size / 2;
@@ -1373,7 +1444,7 @@ function update(dt) {
           for (let r = 0; r < 24 && !best; r++) for (let dx = -r; dx <= r && !best; dx++) for (let dz = -r; dz <= r && !best; dz++) {
             if (Math.max(Math.abs(dx), Math.abs(dz)) !== r) continue; const x = bx + dx, z = bz + dz; if (!w.isLoaded(x, z)) continue;
             const t = w.topSolid(x, z); const id = w.getBlock(x, t, z);
-            if ([B.GRASS, B.SAND, B.SNOW_GRASS, B.DIRT, B.STONE].includes(id) && w.getBlock(x, t + 1, z) !== B.WATER) best = { x, y: t, z };
+            if (([B.GRASS, B.SAND, B.SNOW_GRASS, B.DIRT, B.STONE].includes(id) || (game.spawnCity && [B.SMOOTH_STONE, B.ASPHALT, B.MARBLE].includes(id))) && w.getBlock(x, t + 1, z) !== B.WATER) best = { x, y: t, z };
           }
           if (!best) best = { x: bx, y: w.topSolid(bx, bz), z: bz };
           for (let y = best.y + 1; y < best.y + 3; y++) if (!LIQUID[w.getBlock(best.x, y, best.z)]) w.setBlock(best.x, y, best.z, 0);
@@ -1403,6 +1474,14 @@ function update(dt) {
   updateBreaking(dt);
   game.ticks += dt * 20;
   ents.update(dt);
+  vehicles.update(dt, player, ents); tech.update(dt, player, vehicles);
+  if (player.riding) {
+    const c = player.riding; const kmh = Math.round(Math.abs(c.speed) * 3.6);
+    $('car-speed').textContent = kmh; $('car-batt').textContent = Math.round(c.charge) + '%' + (c.charging ? ' charging' : '');
+    $('car-batt').classList.toggle('low', c.charge < 15);
+    engineT -= dt; if (engineT < 0) { engineT = 0.11; sfx.engine(Math.abs(c.speed)); }
+    if (player.dead) exitCar();
+  }
   tickSpawning(dt);
   fluidT += dt; if (fluidT > 0.25) { fluidT = 0; tickFluids(game.fluidQ, B.WATER, 7); }
   lavaT += dt; if (lavaT > 0.9) { lavaT = 0; tickFluids(game.lavaQ, B.LAVA, 3); }
@@ -1417,17 +1496,25 @@ function render(dt) {
   const p = player;
   const eye = p.sneaking ? 1.32 : 1.62;
   const bob = game.state === 'playing' && p.onGround && !p.flying ? Math.sin(p.bob) * 0.045 : 0;
-  camera.position.set(p.x, p.y + eye + Math.abs(bob) * 0.8, p.z);
-  camera.rotation.y = p.yaw; camera.rotation.x = p.pitch; camera.rotation.z = bob * 0.12;
+  const thirdPerson = !!(p.riding || game.droneView) && game.state === 'playing';
+  if (p.riding) {
+    const c = p.riding; const ry = c.mesh.rotation.y; const fx = Math.sin(ry), fz = Math.cos(ry); const back = c.kind === 'bus' ? 11 : 7.2;
+    camera.position.set(c.x - fx * back, c.y + 3.3, c.z - fz * back); camera.lookAt(c.x + fx * 4, c.y + 1.1, c.z + fz * 4);
+  } else if (game.droneView && game.state === 'playing') {
+    const fx = -Math.sin(p.yaw), fz = -Math.cos(p.yaw); camera.position.set(p.x - fx * 16, Math.min(H + 20, p.y + 28), p.z - fz * 16); camera.lookAt(p.x + fx * 10, p.y, p.z + fz * 10);
+  } else {
+    camera.position.set(p.x, p.y + eye + Math.abs(bob) * 0.8, p.z);
+    camera.rotation.y = p.yaw; camera.rotation.x = p.pitch; camera.rotation.z = bob * 0.12;
+  }
   if (shake > 0) { shake -= dt; camera.position.x += (Math.random() - 0.5) * shake * 0.4; camera.position.y += (Math.random() - 0.5) * shake * 0.4; }
   const fovK = p.sprinting ? 1.12 : p.flying && p.sprinting ? 1.18 : 1; camera.fov += (settings.fov * fovK - camera.fov) * Math.min(1, dt * 8); camera.updateProjectionMatrix();
   updateSky(dt, camera.position);
   ents.updateParticles(dt, game.daylight);
-  if (game.state === 'playing') { updateOutline(); updateHand(dt); } else outline.visible = false;
+  if (game.state === 'playing' && !thirdPerson) { updateOutline(); updateHand(dt); } else outline.visible = false;
   const uw = $('underwater'); const showUw = game.state === 'playing' && (p.headInWater || p.headInLava); uw.style.display = showUw ? 'block' : 'none'; uw.classList.toggle('lava', !!p.headInLava);
   renderer.clear();
   renderer.render(scene, camera);
-  if (game.state === 'playing' && !p.dead) { renderer.clearDepth(); renderer.render(handScene, handCam); }
+  if (game.state === 'playing' && !p.dead && !thirdPerson) { renderer.clearDepth(); renderer.render(handScene, handCam); }
 }
 game.dropHeld = dropHeld;
 game.onHeldChange = () => { if (game.world) rebuildHand(); };
@@ -1452,7 +1539,7 @@ window.render_game_to_text = () => JSON.stringify({
   mobs: ents ? ents.mobs.slice(0, 12).map((m) => ({ type: m.type, x: +m.x.toFixed(1), y: +m.y.toFixed(1), z: +m.z.toFixed(1), hp: m.hp })) : [],
   items: ents ? ents.items.length : 0, chunks: game.chunkMeshes.size, breaking: look ? { breaking: look.breaking, prog: +(look.prog || 0).toFixed(2) } : null,
 });
-window.__dbg = { player, game, pick, useAt, breakBlock, ui, runCommand, keys, settings, switchDim, tryLightPortal, countShelves, get ents() { return ents; } };
+window.__dbg = { vehicles, tech, enterCar, exitCar, player, game, pick, useAt, breakBlock, ui, runCommand, keys, settings, switchDim, tryLightPortal, countShelves, get ents() { return ents; } };
 
 // ---------- boot ----------
 hurtFlash = document.createElement('div'); hurtFlash.id = 'hurt-flash'; document.body.appendChild(hurtFlash);

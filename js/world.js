@@ -6,7 +6,7 @@ import { tileIndex } from './textures.js';
 import { Settlements } from './structures.js';
 import { genNether, netherBiome, NETHER_BIOMES, fortressNear } from './nether.js';
 
-export const CS = 16, H = 80, SEA = 28;
+export const CS = 16, H = 128, SEA = 28;
 const M = 8, R = CS + M * 2, RH = H + 2, RR = R * R;
 
 // property tables
@@ -81,9 +81,9 @@ class MeshBuf {
 }
 const EPS = 0.002;
 function tileUV(t, lu, lv) {
-  const col = t % 16, row = Math.floor(t / 16);
+  const col = t % 32, row = Math.floor(t / 32);
   lu = EPS + lu * (1 - 2 * EPS); lv = EPS + lv * (1 - 2 * EPS);
-  return [(col + lu) / 16, 1 - (row + 1 - lv) / 16];
+  return [(col + lu) / 32, 1 - (row + 1 - lv) / 32];
 }
 
 export class World {
@@ -111,7 +111,7 @@ export class World {
     const temp = n.fbm2(x / 620 + 300, z / 620 - 300, 2), moist = this.noise2.fbm2(x / 520 - 700, z / 520 + 200, 2);
     const desertish = temp > 0.22 && moist < 0.05;
     let h = SEA + 4 + cont * 22 + hills * (desertish ? 3 : 7) + detail * 1.2 + mnt * mnt * ridge * 120;
-    h = Math.max(4, Math.min(H - 10, Math.floor(h)));
+    h = Math.max(4, Math.min(H - 26, Math.floor(h)));
     let biome;
     if (h < SEA - 1) biome = 5;
     else if (h <= SEA + 1 && temp > -0.25) biome = 6;

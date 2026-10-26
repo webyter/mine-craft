@@ -13,6 +13,10 @@ export const B = {
   ENCHANT_TABLE: 77, NETHERRACK: 78, SOUL_SAND: 79, QUARTZ_ORE: 80, NETHER_BRICKS: 81, PORTAL: 82, MAGMA: 83,
   NETHER_GOLD_ORE: 84, CRIMSON_NYLIUM: 85, CRIMSON_STEM: 86, WART_BLOCK: 87, SHROOMLIGHT: 88, BASALT: 89, SPAWNER: 90,
   QUARTZ_BLOCK: 91, SUGAR_CANE: 92, LAPIS_ORE: 93, LAPIS_BLOCK: 94, CRIMSON_FUNGUS: 95, SOUL_SOIL: 96,
+  GLASS_BLUE: 170, GLASS_DARK: 171, LIT_WINDOW: 172, STEEL: 173, BLACK_CONCRETE: 174, BLUE_CONCRETE: 175, RED_CONCRETE: 176,
+  MARBLE: 177, SOLAR_PANEL: 178, LED_SCREEN: 179, LED_AD: 180, LED_AD2: 181, SERVER_RACK: 182, COMPUTER: 183, TV: 184,
+  TRAFFIC_LIGHT: 185, AC_UNIT: 186, VENDING: 187, ATM: 188, EV_CHARGER: 189, HELIPAD: 190, ELEVATOR: 191, STEEL_POLE: 192,
+  HOSPITAL_SIGN: 193, ROAD_LINE: 194, GREEN_CONCRETE: 195, ORANGE_CONCRETE: 196, PLANTER: 197,
 };
 export const I = {
   STICK: 100, COAL: 101, IRON_INGOT: 102, GOLD_INGOT: 103, DIAMOND: 104, REDSTONE: 105, APPLE: 106,
@@ -21,6 +25,7 @@ export const I = {
   SEEDS: 125, WHEAT: 126, EMERALD: 127, HOE: 128,
   LAPIS: 150, BOOK: 151, PAPER: 152, LEATHER: 153, QUARTZ: 154, GOLD_NUGGET: 155, BLAZE_ROD: 156, BLAZE_POWDER: 157,
   GHAST_TEAR: 158, MAGMA_CREAM: 159, NETHER_BRICK: 160,
+  SMARTPHONE: 300, CAR: 301, CIRCUIT: 302, BATTERY: 303, DRONE: 304,
 };
 // tools: 130 + mat*4 + type
 export const TOOL_MATS = ['wooden', 'stone', 'iron', 'golden', 'diamond'];
@@ -138,6 +143,37 @@ def(95, { name: 'Crimson Fungus', tex: 'crimson_fungus', solid: false, opaque: f
 def(96, { name: 'Soul Soil', tex: 'soul_soil', hardness: 0.5, tool: 'shovel' });
 def(41, { name: 'Bookshelf', tex: { top: 'planks', bottom: 'planks', side: 'bookshelf' }, hardness: 1.5, tool: 'axe', drop: 'books' });
 
+// ---------- modern 2025 tech blocks ----------
+const pk = { tool: 'pickaxe', tier: 1 };
+def(170, { name: 'Blue Curtain Glass', tex: 'glass_blue', opaque: false, filter: 0, hardness: 0.4, cullSame: true, drop: 0 });
+def(171, { name: 'Smoked Glass', tex: 'glass_dark', opaque: false, filter: 0, hardness: 0.4, cullSame: true, drop: 0 });
+def(172, { name: 'Lit Office Window', tex: 'lit_window', light: 10, hardness: 0.4, drop: 0 });
+def(173, { name: 'Steel Block', tex: 'steel', hardness: 5, ...pk });
+def(174, { name: 'Black Concrete', tex: 'black_concrete', hardness: 1.8, ...pk });
+def(175, { name: 'Blue Concrete', tex: 'blue_concrete', hardness: 1.8, ...pk });
+def(176, { name: 'Red Concrete', tex: 'red_concrete', hardness: 1.8, ...pk });
+def(177, { name: 'Marble', tex: 'marble', hardness: 2, ...pk });
+def(178, { name: 'Solar Panel', tex: { top: 'solar_top', bottom: 'steel', side: 'solar_side' }, shape: 'slab', opaque: false, filter: 0, hardness: 1.5, ...pk });
+def(179, { name: 'LED Screen', tex: 'led_screen', light: 13, hardness: 1, ...pk });
+def(180, { name: 'LED Billboard', tex: 'led_ad', light: 13, hardness: 1, ...pk });
+def(181, { name: 'LED Sign', tex: 'led_ad2', light: 13, hardness: 1, ...pk });
+def(182, { name: 'Server Rack', tex: { top: 'steel', bottom: 'steel', side: 'rack_side', front: 'rack_front' }, light: 4, hardness: 3, ...pk });
+def(183, { name: 'Computer Desk', tex: { top: 'pc_top', bottom: 'planks', side: 'pc_side', front: 'pc_front' }, opaque: false, cutout: true, filter: 0, light: 5, hardness: 1.5, tool: 'axe' });
+def(184, { name: 'Smart TV', tex: { top: 'black_concrete', bottom: 'black_concrete', side: 'black_concrete', front: 'tv_front' }, light: 6, hardness: 1, ...pk });
+def(185, { name: 'Traffic Light', tex: { top: 'black_concrete', bottom: 'black_concrete', side: 'traffic_side' }, shape: 'cactus', opaque: false, filter: 0, light: 9, hardness: 2, ...pk });
+def(186, { name: 'AC Unit', tex: { top: 'ac_top', bottom: 'steel', side: 'ac_side', front: 'ac_front' }, hardness: 2, ...pk });
+def(187, { name: 'Vending Machine', tex: { top: 'steel', bottom: 'steel', side: 'vend_side', front: 'vend_front' }, light: 8, hardness: 2.5, ...pk });
+def(188, { name: 'ATM', tex: { top: 'steel', bottom: 'steel', side: 'atm_side', front: 'atm_front' }, light: 5, hardness: 3, ...pk });
+def(189, { name: 'EV Charger', tex: { top: 'ev_top', bottom: 'ev_top', side: 'ev_side' }, shape: 'cactus', opaque: false, filter: 0, light: 6, hardness: 2, ...pk });
+def(190, { name: 'Helipad', tex: { top: 'helipad', bottom: 'concrete_gray', side: 'concrete_gray' }, hardness: 2, ...pk });
+def(191, { name: 'Elevator', tex: { top: 'steel', bottom: 'steel', side: 'steel', front: 'elevator' }, light: 4, hardness: 4, ...pk });
+def(192, { name: 'Steel Pole', tex: 'steel', opaque: false, filter: 0, shape: 'post', hardness: 2, ...pk });
+def(193, { name: 'Hospital Sign', tex: 'hospital_sign', light: 12, hardness: 1, ...pk });
+def(194, { name: 'Road Marking', tex: 'road_line', hardness: 1.8, ...pk });
+def(195, { name: 'Green Concrete', tex: 'green_concrete', hardness: 1.8, ...pk });
+def(196, { name: 'Orange Concrete', tex: 'orange_concrete', hardness: 1.8, ...pk });
+def(197, { name: 'Planter', tex: { top: 'grass_top', bottom: 'concrete_gray', side: 'planter_side' }, hardness: 1.5, ...pk });
+
 export const ITEMS = {};
 const it = (id, name, o = {}) => (ITEMS[id] = Object.assign({ id, name, stack: 64 }, o));
 it(I.STICK, 'Stick'); it(I.COAL, 'Coal'); it(I.IRON_INGOT, 'Iron Ingot'); it(I.GOLD_INGOT, 'Gold Ingot');
@@ -152,13 +188,14 @@ it(I.SEEDS, 'Wheat Seeds'); it(I.WHEAT, 'Wheat'); it(I.EMERALD, 'Emerald'); it(I
 it(I.LAPIS, 'Lapis Lazuli'); it(I.BOOK, 'Book'); it(I.PAPER, 'Paper'); it(I.LEATHER, 'Leather'); it(I.QUARTZ, 'Nether Quartz');
 it(I.GOLD_NUGGET, 'Gold Nugget'); it(I.BLAZE_ROD, 'Blaze Rod'); it(I.BLAZE_POWDER, 'Blaze Powder'); it(I.GHAST_TEAR, 'Ghast Tear');
 it(I.MAGMA_CREAM, 'Magma Cream'); it(I.NETHER_BRICK, 'Nether Brick');
+it(I.SMARTPHONE, 'Smartphone', { stack: 1 }); it(I.CAR, 'Electric Car', { stack: 1 }); it(I.CIRCUIT, 'Circuit Board'); it(I.BATTERY, 'Battery'); it(I.DRONE, 'Camera Drone', { stack: 1 });
 it(I.BUCKET, 'Bucket', { stack: 16 }); it(I.WATER_BUCKET, 'Water Bucket', { stack: 1 }); it(I.LAVA_BUCKET, 'Lava Bucket', { stack: 1 });
 for (let m = 0; m < 5; m++) for (let t = 0; t < 4; t++) {
   const n = TOOL_MATS[m][0].toUpperCase() + TOOL_MATS[m].slice(1) + ' ' + TOOL_TYPES[t][0].toUpperCase() + TOOL_TYPES[t].slice(1);
   it(toolId(m, t), n, { stack: 1, dur: MAT_INFO[m].dur, tool: true });
 }
 
-export const isBlock = (id) => id > 0 && id < 100;
+export const isBlock = (id) => (id > 0 && id < 100) || (id >= 170 && id < 256);
 export const itemName = (id) => isBlock(id) ? BLOCKS[id].name : (ITEMS[id] ? ITEMS[id].name : '?');
 export const maxStack = (id) => isBlock(id) ? 64 : (ITEMS[id] ? ITEMS[id].stack : 64);
 export const maxDur = (id) => ITEMS[id] && ITEMS[id].dur ? ITEMS[id].dur : 0;
@@ -167,6 +204,8 @@ export const maxDur = (id) => ITEMS[id] && ITEMS[id].dur ? ITEMS[id].dur : 0;
 export const CREATIVE_LIST = [
   1, 2, 3, 4, 48, 5, 6, 7, 31, 42, 8, 21, 23, 10, 9, 22, 24, 12, 19, 47, 18, 20, 13, 14, 15, 16, 17, 57, 43, 44, 45,
   74, 73, 93, 94, 40, 77, 78, 79, 96, 80, 84, 81, 83, 85, 86, 87, 88, 89, 91, 95, 92, 29, 30, 70, 66, 67, 68, 69, 75, 76, 58, 59, 64, 65, 71, 72, 63, 41, 35, 49, 50, 51, 52, 53, 25, 26, 27, 28, 38, 46, 56, 36, 37, 32, 33, 34, 55,
+  170, 171, 172, 173, 174, 175, 176, 195, 196, 177, 194, 197, 178, 179, 180, 181, 182, 183, 184, 185, 186, 187, 188, 189, 190, 191, 192, 193,
+  I.SMARTPHONE, I.CAR, I.DRONE, I.CIRCUIT, I.BATTERY,
   I.STICK, I.COAL, I.EMERALD, I.LAPIS, I.BOOK, I.PAPER, I.LEATHER, I.QUARTZ, I.GOLD_NUGGET, I.BLAZE_ROD, I.BLAZE_POWDER, I.GHAST_TEAR, I.MAGMA_CREAM, I.NETHER_BRICK, I.SEEDS, I.WHEAT, I.HOE, I.IRON_INGOT, I.GOLD_INGOT, I.DIAMOND, I.REDSTONE, I.FLINT, I.FLINT_STEEL, I.BUCKET, I.WATER_BUCKET, I.LAVA_BUCKET, I.GUNPOWDER, I.BONE,
   I.APPLE, I.BREAD, I.RAW_PORK, I.COOKED_PORK, I.RAW_BEEF, I.STEAK, I.RAW_MUTTON, I.COOKED_MUTTON, I.ROTTEN_FLESH,
   ...[0, 1, 2, 3, 4].flatMap((m) => [0, 1, 2, 3].map((t) => toolId(m, t))),
@@ -226,6 +265,33 @@ shaped(['GGG', 'GCG', 'GGG'], { G: 12, C: I.COAL }, 76, 8);
 shaped(['SSS'], { S: 3 }, 70, 3);
 shaped(['GSG', 'SCS', 'GSG'], { G: 12, S: 6, C: I.COAL }, 71, 2);
 shapeless([6, 7, 35], 66, 8); shapeless([6, 7, I.COAL], 68, 8); shapeless([6, 7], 67, 8); shapeless([6, 7, 52], 69, 8);
+// modern tech
+{ const S = 173, C = I.CIRCUIT;
+shaped(['RGR', 'III'], { R: I.REDSTONE, G: I.GOLD_INGOT, I: I.IRON_INGOT }, C, 2);
+shaped(['I', 'R', 'I'], { I: I.IRON_INGOT, R: I.REDSTONE }, I.BATTERY, 2);
+shaped(['G', 'C', 'B'], { G: 12, C, B: I.BATTERY }, I.SMARTPHONE);
+shaped(['GGG', 'ICI', 'PPP'], { G: 12, I: I.IRON_INGOT, C, P: 10 }, 183);
+shaped(['GGG', 'GCG'], { G: 171, C }, 184);
+shaped(['GGG', 'RLR'], { G: 12, R: I.REDSTONE, L: 38 }, 179, 4);
+shapeless([179, I.LAPIS], 180); shapeless([179, I.REDSTONE], 181);
+shaped(['GGG', 'LCL'], { G: 12, L: I.LAPIS, C }, 178, 3);
+shaped(['II', 'II'], { I: I.IRON_INGOT }, S, 4);
+shaped(['S', 'S', 'S'], { S }, 192, 6);
+shapeless([12, I.LAPIS], 170, 1); shapeless([12, I.COAL], 171, 1); shapeless([12, 38], 172, 2);
+shapeless([91, 66], 177, 2); shapeless([66, I.COAL], 174); shapeless([66, I.LAPIS], 175); shapeless([66, I.REDSTONE], 176);
+shapeless([66, 51], 195); shapeless([66, 52, I.REDSTONE], 196); shapeless([68, 66], 194, 2); shapeless([68, 69], 190, 2);
+shaped(['SCS', 'SCS', 'SCS'], { S, C }, 182);
+shaped(['SSS', 'SCS', 'SSS'], { S, C }, 186);
+shaped(['SGS', 'SCS', 'SES'], { S, G: 12, C, E: I.EMERALD }, 187);
+shaped(['SGS', 'SCS', 'SBS'], { S, G: 12, C, B: I.GOLD_INGOT }, 188);
+shaped(['SB', 'SC'], { S, B: I.BATTERY, C }, 189);
+shaped(['SRS', 'SLS', 'SES'], { S, R: I.REDSTONE, L: 38, E: I.EMERALD }, 185);
+shaped(['SCS'], { S, C }, 191);
+shapeless([66, I.REDSTONE, I.REDSTONE, 38], 193);
+shapeless([4, 2, 1], 197, 2);
+shaped(['SGS', 'SCS', 'KXK'], { S, G: 12, C, K: 57, X: I.BATTERY }, I.CAR);
+shaped([' S ', 'SCS', ' B '], { S, C, B: I.BATTERY }, I.DRONE);
+}
 const MATS = [10, 4, I.IRON_INGOT, I.GOLD_INGOT, I.DIAMOND];
 for (let m = 0; m < 5; m++) {
   const k = { M: MATS[m], S: I.STICK };

@@ -141,6 +141,7 @@ export class UI {
   }
   close() {
     if (!this.screen) return;
+    if (this.screen === 'device') { if (this.game.tech) this.game.tech.close(); else this.screen = null; return; }
     if (this.craft) for (let i = 0; i < this.craft.grid.length; i++) { const s = this.craft.grid[i]; if (s) this.giveBack(s); }
     if (this.tile && this.tile.type === 'enchant') for (let i = 0; i < 2; i++) { const s = this.tile.slots[i]; if (s) this.giveBack(s); this.tile.slots[i] = null; }
     if (this.cursor) { this.giveBack(this.cursor); this.cursor = null; }
@@ -208,7 +209,7 @@ export class UI {
   }
   renderScreen() {
     const body = this.$('inv-body'); body.innerHTML = ''; body.classList.remove('split');
-    const kind = this.screen; if (!kind) return;
+    const kind = this.screen; if (!kind || kind === 'device') return;
     const grid = (arr, from, to, cols, opts) => {
       const g = document.createElement('div'); g.className = 'grid'; g.style.gridTemplateColumns = `repeat(${cols}, var(--slot-size))`;
       for (let i = from; i < to; i++) g.appendChild(this.makeSlot(arr, i, opts)); return g;
