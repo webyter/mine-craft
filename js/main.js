@@ -11,6 +11,10 @@ import { Inventory, UI } from './ui.js';
 import { initAudio, sfx, audioSettings, setVolumes } from './audio.js';
 import { Vehicles } from './vehicles.js';
 import { Tech } from './tech.js';
+import { Net } from './net.js';
+import { Avatar } from './avatar.js';
+import { createSocial } from './social.js';
+import { createWorldMap } from './worldmap.js';
 
 THREE.ColorManagement.enabled = false;
 const $ = (id) => document.getElementById(id);
@@ -173,7 +177,7 @@ let ents = null;
 // ---------- cars + tech ----------
 let planeSndT = 0, engineT = 0;
 const vehicles = new Vehicles(game, scene, {
-  controls: () => { let t = 0, s = 0; if (keys.w || keys.arrowup) t += 1; if (keys.s || keys.arrowdown) t -= 1; if (keys.a || keys.arrowleft) s -= 1; if (keys.d || keys.arrowright) s += 1; if (joy.id !== null) { t += -joy.y; s += joy.x; } if (ui.screen || game.chatOpen) t = s = 0; return { throttle: Math.max(-1, Math.min(1, t)), steer: Math.max(-1, Math.min(1, s)) }; },
+  controls: () => { let t = 0, s = 0; if (keys.w || keys.arrowup) t += 1; if (keys.s || keys.arrowdown) t -= 1; if (keys.a || keys.arrowleft) s -= 1; if (keys.d || keys.arrowright) s += 1; if (joy.id !== null) { t += -joy.y; s += joy.x; } if (ui.screen || game.chatOpen || game.overlay) t = s = 0; return { throttle: Math.max(-1, Math.min(1, t)), steer: Math.max(-1, Math.min(1, s)) }; },
   horn: (c) => { if (Math.hypot(c.x - player.x, c.z - player.z) < 30) sfx.horn(); },
   hurtPlayer: (d, fx, fz) => { if (game.mode !== 'survival') return; player.hurtCd = 0; game.damagePlayer(Math.round(d), player.x - fx, player.z - fz, 'car'); },
   crash: (c, v) => { if (c === player.riding) { shake = 0.3; sfx.hit(); if (game.mode === 'survival' && v > 15) { player.hurtCd = 0; game.damagePlayer(Math.floor((v - 13) / 2), undefined, undefined, 'car'); } } },
@@ -216,6 +220,7 @@ function newWorld({ seedText = '', mode = 'survival', difficulty = 2, type = 'in
   const seed = seedText ? (/^-?\d+$/.test(seedText) ? (parseInt(seedText, 10) >>> 0) : hashSeed(seedText)) : (Math.random() * 2 ** 32) >>> 0;
   game.seed = seed; game.seedText = seedText || String(seed);
   game.world = new World(seed, type); game.dim = 'overworld'; game.dims = { overworld: { world: game.world } }; game.mode = mode; game.difficulty = difficulty; game.worldName = name;
+  if (game.onWorldCreated) game.onWorldCreated(game.world);
   game.ticks = 1000; game.raining = false; game.rainT = 900 + Math.random() * 1200;
   if (!ents) ents = new EntityManager(game); else { ents.world = game.world; }
   player.elytra = null; player.gliding = false; game.endState = null; player.armor = [null, null, null, null]; player.boat = null; game.thunder = false; if (typeof setElytraBtn === 'function') setElytraBtn();
@@ -293,7 +298,10 @@ const NEEDS_SUPPORT = new Set([B.TALL_GRASS, B.DANDELION, B.POPPY, B.DEAD_BUSH, 
 const isWheat = (id) => id >= B.WHEAT_0 && id <= B.WHEAT_3;
 const tkey = (x, y, z) => x + ',' + y + ',' + z;
 game.setBlock = (x, y, z, id, meta = 0) => {
-  const w = game.world; w.setBlock(x, y, z, id, meta);
+  const w = game.world;
+  if (game.net && game.net.online && !game.net.muted && game.dim === 'overworld' && game.net.canEdit(x, z) !== true) return;
+  w.setBlock(x, y, z, id, meta);
+  if (game.net && game.net.online) game.net.localEdit(x, y, z, id, meta);
   // neighbors: fluids + gravity + support
   for (const [dx, dy, dz] of [[1, 0, 0], [-1, 0, 0], [0, 0, 1], [0, 0, -1], [0, 1, 0], [0, -1, 0]]) {
     const nx = x + dx, ny = y + dy, nz = z + dz; const n = w.getBlock(nx, ny, nz);
@@ -349,6 +357,7 @@ function breakTime(id, held) {
 }
 function breakBlock(x, y, z) {
   const w = game.world; const id = w.getBlock(x, y, z); if (!id || BLOCKS[id].hardness < 0) return;
+  if (!protectOk(x, z)) return;
   const held = game.inv.held();
   if (game.mode === 'survival') {
     const d = resolveDrop(id, held);
@@ -1274,7 +1283,7 @@ function pick(sx, sy) {
   ndc.set((sx / innerWidth) * 2 - 1, -(sy / innerHeight) * 2 + 1);
   raycaster.setFromCamera(ndc, camera);
   const o = raycaster.ray.origin, d = raycaster.ray.direction;
-  const reach = game.mode === 'creative' ? 7 : 5;
+  const reach = (game.mode === 'creative' ? 7 : 5) + (camMode ? camDist : 0);
   const hit = game.world.raycast(o.x, o.y, o.z, d.x, d.y, d.z, reach, (id) => id !== 0 && !LIQUID[id]);
   const mob = ents.raycastMobs(o, d, reach - 1.5);
   const fb = ents.raycastFireballs(o, d, reach + 1);
@@ -1288,7 +1297,12 @@ function pickLiquid(sx, sy) {
   return game.world.raycast(o.x, o.y, o.z, d.x, d.y, d.z, 5, (id, x, y, z) => (LIQUID[id] && game.world.getMeta(x, y, z) === 0) || (id !== 0 && !LIQUID[id]));
 }
 let swingT = 0;
-function swing() { swingT = 0.28; }
+function swing() { swingT = 0.28; if (game.net) game.net.swung = true; if (selfAv) selfAv.swingT = 0.3; }
+let protectToastT = 0;
+function protectOk(x, z) {
+  if (!game.net || !game.net.online) return true; const r = game.net.canEdit(x, z); if (r === true) return true;
+  const now = performance.now(); if (now - protectToastT > 1500) { toast('This is ' + r + "'s home. Ask them to add you as a friend to build here"); protectToastT = now; } return false;
+}
 function attackMob(m) {
   const held = game.inv.held(); const t = held ? toolInfo(held.id) : null;
   let dmg = 1; if (t) dmg = t.type === 'sword' ? 4 + t.dmg : t.type === 'axe' ? 3 + t.dmg : 2 + t.dmg * 0.5;
@@ -1444,6 +1458,7 @@ function useAt(sx, sy) {
     if (bid === B.TABLE) { ui.open('table'); return; }
     if (bid === B.ENCHANT_TABLE) { ui.open('enchant', { type: 'enchant', slots: [null, null], shelves: countShelves(b.x, b.y, b.z), x: b.x, y: b.y, z: b.z }); for (let i = 0; i < 6; i++) setTimeout(() => ents.burst(b.x + 0.5 + (Math.random() - 0.5) * 3, b.y + 1.6, b.z + 0.5 + (Math.random() - 0.5) * 3, [0.75, 0.6, 1], 2, 0.6, 0.06, 1), i * 80); return; }
     if (bid === B.FURNACE || bid === B.LIT_FURNACE) { ui.open('furnace', getTile(b.x, b.y, b.z, 'furnace')); return; }
+    if (bid === B.CHEST && !protectOk(b.x, b.z)) return;
     if (bid === B.CHEST) { ui.open('chest', getTile(b.x, b.y, b.z, 'chest')); return; }
     if (bid === B.BED) { sleep(b); return; }
     if (bid === B.TNT && held && held.id === I.FLINT_STEEL) { game.world.setBlock(b.x, b.y, b.z, 0); ents.primeTNT(b.x, b.y, b.z); if (game.mode === 'survival') game.inv.damageHeld(1); swing(); return; }
@@ -1491,6 +1506,7 @@ function useAt(sx, sy) {
     else { meta = { 3: 2, 1: 3, 2: 0, 0: 1 }[facingMeta()]; }
     const wall = [[0, 1], [0, -1], [1, 0], [-1, 0]][meta]; if (!SOLID[w.getBlock(tx + wall[0], ty, tz + wall[1])]) { toast('Ladders need a wall behind them'); return; }
   }
+  if (!protectOk(tx, tz)) return;
   game.setBlock(tx, ty, tz, placeId, meta);
   if (placeId === B.SUGAR_CANE) w.crops.set(tkey(tx, ty, tz), [tx, ty, tz]);
   sfx.place(placeId); swing(); game.stats.placed++;
@@ -1525,9 +1541,10 @@ $('chat-form').addEventListener('submit', (e) => { e.preventDefault(); const v =
 const NAME_TO_ID = {};
 for (const id of CREATIVE_LIST) NAME_TO_ID[itemName(id).toLowerCase().replace(/[^a-z0-9]+/g, '_')] = id;
 function runCommand(v) {
-  if (!v.startsWith('/')) { chatLog('<Steve> ' + v); return; }
+  if (!v.startsWith('/')) { if (game.net && game.net.online) game.net.chat(v); else { chatLog('<' + (social.name || 'Steve') + '> ' + v); if (selfAv) selfAv.say(v); } return; }
   const [cmd, ...a] = v.slice(1).split(/\s+/);
   const c = cmd.toLowerCase();
+  if (onlineCommand(c, a, v)) return;
   if (c === 'help') chatLog('Commands: /gamemode s|c, /time set day|night|noon|midnight, /weather clear|rain|thunder, /give <item> [n], /tp x y z, /summon pig|cow|sheep|chicken|wolf|cat|villager|iron_golem|zombie|creeper|skeleton|enderman|slime|zombified_piglin|ghast|blaze|magma_cube|ender_dragon|tnt, /locate village|town|city|windfarm|stronghold|fortress|end_city, /car [bus|police|taxi], /phone, /dim nether|end|overworld, /enchant <name> [level], /difficulty 0-3, /kill, /seed, /spawnpoint, /heal');
   else if (c === 'gamemode' || c === 'gm') { const m = (a[0] || '').toLowerCase(); setMode(m.startsWith('c') || m === '1' ? 'creative' : 'survival'); chatLog('Game mode set to ' + game.mode); }
   else if (c === 'time') { const t = (a[1] || a[0] || '').toLowerCase(); const map = { day: 1000, noon: 6000, sunset: 12000, night: 13500, midnight: 18000, sunrise: 23000 }; const base = Math.floor(game.ticks / 24000) * 24000; const n = map[t] ?? parseInt(t, 10); if (!isNaN(n)) { game.ticks = base + n; chatLog('Set the time to ' + t); } }
@@ -1618,10 +1635,11 @@ $('btn-create').onclick = () => {
 $('btn-respawn').onclick = () => { $('death').classList.add('hidden'); resetPlayer(); ui.lastStats = ''; if (game.dim !== 'overworld') switchDim('overworld', { respawn: true }); };
 $('btn-death-quit').onclick = () => { $('death').classList.add('hidden'); resetPlayer(); if (game.dim !== 'overworld') { switchDim('overworld', { respawn: true }); finishArrival(); } toTitle(); };
 function toTitle() {
+  const wasOnline = game.online; if (game.online) { game.online = false; net.leave(); }
   game.state = 'title'; $('hud').classList.add('hidden'); show('title'); ui.close(); closeChat();
   let cont = $('btn-continue');
   if (!cont) { cont = document.createElement('button'); cont.className = 'btn'; cont.id = 'btn-continue'; $('btn-play').after(cont); cont.onclick = () => { show(null); $('hud').classList.remove('hidden'); game.state = 'playing'; resize(); }; }
-  cont.textContent = 'Continue: ' + game.worldName;
+  cont.textContent = 'Continue: ' + game.worldName; cont.classList.toggle('hidden', !!wasOnline);
   $('btn-play').textContent = 'New World';
   titleCam.x = player.x; titleCam.z = player.z;
 }
@@ -1664,7 +1682,7 @@ function updatePlayer(dt) {
   const w = game.world; const p = player;
   if (!w.isLoaded(Math.floor(p.x), Math.floor(p.z))) return; // wait for terrain
   if (p.riding) { if (!vehicles.list.includes(p.riding)) exitCar(); else { p.yaw = p.riding.yaw + Math.PI; p.sneaking = p.sprinting = false; p.inWater = p.inLava = p.headInWater = p.headInLava = false; return; } }
-  const inputBlocked = ui.screen || game.chatOpen || game.inBed;
+  const inputBlocked = ui.screen || game.chatOpen || game.inBed || game.overlay;
   if (p.boat) { updateBoatRide(dt, inputBlocked); return; }
   // input vector
   let mx = 0, mz = 0;
@@ -1974,6 +1992,7 @@ function update(dt) {
   game.ticks += dt * 20;
   ents.update(dt);
   vehicles.update(dt, player, ents); tech.update(dt, player, vehicles);
+  onlineTick(dt);
   if (player.riding) {
     const c = player.riding; const kmh = Math.round(Math.abs(c.speed) * 3.6);
     $('car-speed').textContent = kmh; $('car-batt').textContent = Math.round(c.charge) + '%' + (c.charging ? ' charging' : '');
@@ -1996,22 +2015,40 @@ function render(dt) {
   const p = player;
   const eye = p.sneaking ? 1.32 : 1.62;
   const bob = game.state === 'playing' && p.onGround && !p.flying ? Math.sin(p.bob) * 0.045 : 0;
-  const thirdPerson = !!(p.riding || game.droneView) && game.state === 'playing';
+  const thirdPerson = !!(p.riding || game.droneView || camMode || emoteCam > 0) && game.state === 'playing';
+  const ownView = game.state === 'playing' && !p.riding && !game.droneView && (camMode || emoteCam > 0);
   if (p.riding) {
     const c = p.riding; const ry = c.mesh.rotation.y; const fx = Math.sin(ry), fz = Math.cos(ry); const back = c.kind === 'bus' ? 11 : 7.2;
     camera.position.set(c.x - fx * back, c.y + 3.3, c.z - fz * back); camera.lookAt(c.x + fx * 4, c.y + 1.1, c.z + fz * 4);
   } else if (game.droneView && game.state === 'playing') {
     const fx = -Math.sin(p.yaw), fz = -Math.cos(p.yaw); camera.position.set(p.x - fx * 16, Math.min(H + 20, p.y + 28), p.z - fz * 16); camera.lookAt(p.x + fx * 10, p.y, p.z + fz * 10);
+  } else if (ownView) {
+    p.stepY = (p.stepY || 0) * Math.exp(-dt * 16); if (p.stepY < 0.005) p.stepY = 0;
+    const front = camMode === 2 || (emoteCam > 0 && camMode !== 1);
+    const hx = p.x, hy = p.y + eye - p.stepY, hz = p.z; const pc = Math.cos(p.pitch), ps = Math.sin(p.pitch);
+    let dx = Math.sin(p.yaw) * pc, dy = -ps, dz = Math.cos(p.yaw) * pc; if (front) { dx = -dx; dz = -dz; dy = -dy; }
+    let dist = 4; const hit = game.world.raycast(hx, hy, hz, dx, dy, dz, 4.2, (id) => id !== 0 && OPAQUE[id]); if (hit) dist = Math.max(0.6, hit.t - 0.35);
+    camDist = camDist + (dist - camDist) * Math.min(1, dt * (dist < camDist ? 30 : 6));
+    camera.position.set(hx + dx * camDist, hy + dy * camDist, hz + dz * camDist);
+    if (front) camera.lookAt(hx, hy - 0.2, hz); else { camera.rotation.set(p.pitch, p.yaw, 0); }
   } else {
     p.stepY = (p.stepY || 0) * Math.exp(-dt * 16); if (p.stepY < 0.005) p.stepY = 0;
     camera.position.set(p.x, p.y + eye + Math.abs(bob) * 0.8 - p.stepY, p.z);
     camera.rotation.y = p.yaw; camera.rotation.x = p.pitch; camera.rotation.z = bob * 0.12;
   }
+  if (selfAv) {
+    selfAv.group.visible = ownView && !p.dead && camDist > 1.1;
+    if (selfAv.group.visible) {
+      selfAv.pos.set(p.x, p.y - (p.stepY || 0), p.z); selfAv.yaw = p.yaw; selfAv.pitch = p.pitch;
+      selfAv.speed = Math.hypot(p.vx || 0, p.vz || 0); selfAv.flags = (p.sneaking ? 1 : 0) | (p.flying ? 4 : 0) | (p.boat || p.sitting ? 8 : 0) | (p.gliding ? 32 : 0);
+      selfAv.update(dt, camera.position);
+    }
+  }
   if (shake > 0) { shake -= dt; camera.position.x += (Math.random() - 0.5) * shake * 0.4; camera.position.y += (Math.random() - 0.5) * shake * 0.4; }
   const fovK = p.sprinting ? 1.12 : p.flying && p.sprinting ? 1.18 : 1; camera.fov += (settings.fov * fovK - camera.fov) * Math.min(1, dt * 8); camera.updateProjectionMatrix();
   updateSky(dt, camera.position);
   ents.updateParticles(dt, game.daylight);
-  if (game.state === 'playing' && !thirdPerson) { updateOutline(); updateHand(dt); } else outline.visible = false;
+  if (game.state === 'playing' && (!thirdPerson || (ownView && camMode === 1))) { updateOutline(); if (!thirdPerson) updateHand(dt); } else outline.visible = false;
   const uw = $('underwater'); const showUw = game.state === 'playing' && (p.headInWater || p.headInLava); uw.style.display = showUw ? 'block' : 'none'; uw.classList.toggle('lava', !!p.headInLava);
   renderer.clear();
   renderer.render(scene, camera);
@@ -2040,7 +2077,7 @@ window.render_game_to_text = () => JSON.stringify({
   mobs: ents ? ents.mobs.slice(0, 12).map((m) => ({ type: m.type, x: +m.x.toFixed(1), y: +m.y.toFixed(1), z: +m.z.toFixed(1), hp: m.hp })) : [],
   items: ents ? ents.items.length : 0, chunks: game.chunkMeshes.size, breaking: look ? { breaking: look.breaking, prog: +(look.prog || 0).toFixed(2) } : null,
 });
-window.__dbg = { vehicles, tech, enterCar, exitCar, player, game, pick, useAt, breakBlock, ui, runCommand, keys, settings, switchDim, tryLightPortal, countShelves, checkEndPortal, get ents() { return ents; }, get bobber() { return bobber; }, get boats() { return boats; } };
+window.__dbg = { vehicles, tech, enterCar, exitCar, player, game, pick, useAt, breakBlock, ui, runCommand, keys, settings, switchDim, tryLightPortal, countShelves, checkEndPortal, get ents() { return ents; }, get bobber() { return bobber; }, get boats() { return boats; }, get net() { return game.net; }, get social() { return social; }, get selfAv() { return selfAv; } };
 
 // ---------- boot ----------
 hurtFlash = document.createElement('div'); hurtFlash.id = 'hurt-flash'; document.body.appendChild(hurtFlash);
@@ -2057,3 +2094,86 @@ player.x = titleCam.x; player.z = titleCam.z; player.y = 50;
 startLoading('title');
 requestAnimationFrame(frame);
 void [SOLID, OPAQUE, FUEL, iconFor, isTool, NETHER_BIOMES];
+
+// ---------- online multiplayer, avatars, social ----------
+let camMode = 0, camDist = 4, emoteCam = 0, selfAv = null, lastReplyTo = null;
+const net = new Net({
+  game, player, scene, toast: (m) => toast(m, 2600), chatLog, sfx: (n) => { try { sfx[n] && sfx[n](); } catch (_) { /* */ } },
+  teleport: (x, y, z, keepFlying) => { teleportPlayer(x, y, z); if (!keepFlying) player.flying = game.mode === 'creative' && player.flying; },
+  setWeather: (w) => { game.raining = !!w.raining; game.thunder = !!w.thunder; game.rainT = 9999; if (w.thunder) toast('A thunderstorm is rolling in'); },
+  setTicks: (t) => { if (Math.abs(game.ticks - t) > 300) game.ticks = t; },
+  get selfAvatar() { return selfAv; },
+});
+game.net = net;
+selfAv = new Avatar(null, '', { noTag: true }); selfAv.group.visible = false; scene.add(selfAv.group);
+const social = createSocial({
+  net, game, player, show, toast: (m) => toast(m, 2200), endPointer,
+  resume: () => { game.overlay = null; if (game.world && game.state !== 'title') { show(null); $('hud').classList.remove('hidden'); game.state = 'playing'; } },
+  onSkin: (sk) => { selfAv.build(sk); },
+  startOnline, leaveOnline: () => toTitle(),
+  playEmote, cycleCamera, openMap: () => worldMap.show(),
+  goHome, travelTo,
+});
+const worldMap = createWorldMap({ game, player, net, toast: (m) => toast(m, 2200), endPointer, goHome, travelTo });
+for (const id of ['btn-social', 'btn-emote', 'btn-cam', 'btn-map']) $(id).addEventListener('pointerdown', (e) => e.stopPropagation());
+for (const id of ['social', 'emotes', 'worldmap']) for (const ev of ['pointerdown', 'touchstart']) $(id).addEventListener(ev, (e) => e.stopPropagation(), { passive: true });
+game.onWorldCreated = (w) => { worldMap.reset(); if (game.online) net.attachWorld(w); };
+function startOnline(mode) {
+  initAudio(); game.online = true;
+  newWorld({ seedText: (net.hi && net.hi.seed) || 'mine craft online', mode, difficulty: 2, name: 'Online World' });
+  if (net.serverTicks != null) game.ticks = net.serverTicks;
+  if (net.weather) { game.raining = !!net.weather.raining; game.thunder = !!net.weather.thunder; game.rainT = 9999; }
+  if (net.me && net.me.home != null) { const s = net.homeSpot(net.me.home); if (s) { player.spawn = { x: s.x, y: s.y, z: s.z + 3 }; } }
+  startLoading('playing');
+  setTimeout(() => { if (game.online) { toast(net.me.home == null ? 'Welcome, ' + net.me.name + '. Open Social > Homes to claim your free home' : 'Welcome back, ' + net.me.name, 4200); } }, 2500);
+}
+function goHome(idx) {
+  if (!game.online) { toast('Homes are part of the online world'); return; }
+  if (idx == null) idx = net.me.home; if (idx == null) { toast('You have no home yet. Open Social > Homes to claim one'); return; }
+  if (game.dim !== 'overworld') { toast('Go back to the Overworld first'); return; }
+  const s = net.homeSpot(idx); if (!s) return; teleportPlayer(s.x, s.base + 2.05, s.z); const h = net.homes[idx]; toast(h ? (h.owner === net.me.id ? 'Welcome home' : 'Visiting ' + h.name + "'s home") : 'Empty plot');
+}
+function travelTo(x, z, label) {
+  if (game.dim !== 'overworld') { toast('Fast travel only works in the Overworld'); return; }
+  const c = game.world.column(x, z); teleportPlayer(x + 0.5, Math.max(c.h, SEA) + 24, z + 0.5);
+  player.travelSafe = 6; toast('Travelling to ' + label);
+}
+function cycleCamera() { camMode = (camMode + 1) % 3; toast(['First person', 'Third person', 'Front view'][camMode]); }
+function playEmote(id) {
+  if (game.state !== 'playing') return;
+  selfAv.playEmote(id); if (game.online) net.emote(id);
+  if (!camMode) emoteCam = id === 'sit' ? 9999 : selfAv.emoteLen || 2.5;
+  player.sitting = id === 'sit';
+}
+function onlineTick(dt) {
+  if (emoteCam > 0) { emoteCam -= dt; const moving = (joy.id !== null && Math.hypot(joy.x, joy.y) > 0.2) || keys.w || keys.a || keys.s || keys.d || jumpHeld; if (moving) { emoteCam = 0; selfAv.stopEmote(); player.sitting = false; } }
+  if (player.travelSafe > 0) { player.travelSafe -= dt; player.fallStart = null; if (player.onGround) player.travelSafe = 0; else if (game.world.isLoaded(Math.floor(player.x), Math.floor(player.z))) { const top = game.world.topSolid(Math.floor(player.x), Math.floor(player.z)); if (player.y > top + 3) { player.y = top + 1.05; player.vy = 0; } } else { player.vy = 0; } }
+  if (game.online) { game.rainT = 9999; net.update(dt, camera); }
+}
+function onlineCommand(c, a, raw) {
+  const rest = (n) => raw.trim().split(/\s+/).slice(n + 1).join(' ');
+  const needOnline = () => { if (!game.online || !net.online) { chatLog('That only works in the online world'); return false; } return true; };
+  const find = (n) => { const r = net.playerByName(n); if (r) return r.id; const f = net.friends.find((x) => x.name.toLowerCase() === String(n || '').toLowerCase()); return f ? f.id : n; };
+  if (c === 'time') { setTimeout(() => game.online && net.syncTime(game.ticks), 0); return false; }
+  if (c === 'emote' || c === 'e') { playEmote((a[0] || 'wave').toLowerCase()); return true; }
+  if (c === 'look' || c === 'skin' || c === 'character') { social.openLobby('edit'); return true; }
+  if (c === 'map') { worldMap.show(); return true; }
+  if (c === 'camera' || c === 'cam' || c === 'view') { cycleCamera(); return true; }
+  if (c === 'social' || c === 'friends') { if (c === 'friends' && a[0]) { if (needOnline()) net.friend('add', find(a[0])); return true; } social.openOverlay('social'); return true; }
+  if (c === 'msg' || c === 'w' || c === 'tell' || c === 'whisper' || c === 'dm') { if (!needOnline()) return true; if (!a[0] || !rest(1)) { chatLog('Usage: /msg <name> <message>'); return true; } const id = find(a[0]); lastReplyTo = id; net.dm(id, rest(1)); chatLog('To ' + a[0] + ': ' + rest(1)); return true; }
+  if (c === 'r' || c === 'reply') { if (!needOnline()) return true; const last = lastReplyTo || [...net.threads.keys()].pop(); if (!last) { chatLog('Nobody to reply to'); return true; } net.dm(last, rest(0)); return true; }
+  if (c === 'home') { goHome(); return true; }
+  if (c === 'sethome') { if (!needOnline()) return true; if (net.me.home == null) { chatLog('Claim a home first: Social > Homes'); return true; } player.spawn = { x: player.x, y: player.y, z: player.z }; chatLog('Spawn point set'); return true; }
+  if (c === 'claim') { if (!needOnline()) return true; net.claim((a[0] || 'cottage').toLowerCase()); return true; }
+  if (c === 'visit') { if (!needOnline()) return true; const n = (a[0] || '').toLowerCase(); const i = net.homes.findIndex((h) => h && h.name.toLowerCase() === n); if (i < 0) chatLog('No home found for ' + (a[0] || '?')); else goHome(i); return true; }
+  if (c === 'tpa') { if (!needOnline()) return true; if (!a[0]) { chatLog('Usage: /tpa <name>'); return true; } const id = find(a[0]); net.tpa(id, net.isFriend(id)); return true; }
+  if (c === 'tpaccept') { if (!needOnline()) return true; const q = a[0] ? net.tpReqs.find((x) => x.name.toLowerCase() === a[0].toLowerCase()) : net.tpReqs.at(-1); if (q) net.tpaccept(q.id); else chatLog('No teleport requests'); return true; }
+  if (c === 'block') { if (!needOnline()) return true; net.friend('block', find(a[0])); return true; }
+  if (c === 'unblock') { if (!needOnline()) return true; net.friend('unblock', find(a[0])); return true; }
+  if (c === 'unfriend') { if (!needOnline()) return true; net.friend('remove', find(a[0])); return true; }
+  if (c === 'players' || c === 'online' || c === 'list') { if (!needOnline()) return true; chatLog('Online (' + (net.players.size + 1) + '): ' + [net.me.name, ...[...net.players.values()].map((r) => r.name)].join(', ')); return true; }
+  if (c === 'nearby' || c === 'near') { if (!needOnline()) return true; if (rest(0)) { const ch = net.channel; net.channel = 'near'; net.chat(rest(0)); net.channel = ch; } else { net.channel = 'near'; chatLog('Chat set to nearby players'); } return true; }
+  if (c === 'global' || c === 'all' || c === 'shout') { if (!needOnline()) return true; if (rest(0)) { const ch = net.channel; net.channel = 'all'; net.chat(rest(0)); net.channel = ch; } else { net.channel = 'all'; chatLog('Chat set to everyone'); } return true; }
+  return false;
+}
+net.on('dm', (m) => { if (m.msg.from !== net.me.id) lastReplyTo = m.with; });
