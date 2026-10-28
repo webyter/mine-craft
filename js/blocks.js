@@ -16,10 +16,11 @@ export const B = {
   GLASS_BLUE: 170, GLASS_DARK: 171, LIT_WINDOW: 172, STEEL: 173, BLACK_CONCRETE: 174, BLUE_CONCRETE: 175, RED_CONCRETE: 176,
   MARBLE: 177, SOLAR_PANEL: 178, LED_SCREEN: 179, LED_AD: 180, LED_AD2: 181, SERVER_RACK: 182, COMPUTER: 183, TV: 184,
   TRAFFIC_LIGHT: 185, AC_UNIT: 186, VENDING: 187, ATM: 188, EV_CHARGER: 189, HELIPAD: 190, ELEVATOR: 191, STEEL_POLE: 192,
-  HOSPITAL_SIGN: 193, ROAD_LINE: 194, GREEN_CONCRETE: 195, ORANGE_CONCRETE: 196, PLANTER: 197,
+  HOSPITAL_SIGN: 193, ROAD_LINE: 194, GREEN_CONCRETE: 195, ORANGE_CONCRETE: 196, PLANTER: 197, VENDING_TOP: 218,
   END_STONE: 97, END_FRAME: 98, END_PORTAL: 99, END_FRAME_EYE: 198, PURPUR: 199, PURPUR_PILLAR: 200, END_BRICKS: 201,
   END_ROD: 202, CHORUS_PLANT: 203, CHORUS_FLOWER: 204, DRAGON_EGG: 205, CRACKED_BRICKS: 206, MOSSY_BRICKS: 207, IRON_BARS: 208,
-  SLIME: 209, LADDER: 210, COBWEB: 211, PACKED_ICE: 212, CAMPFIRE: 213,
+  SLIME: 209, LADDER: 210, COBWEB: 211, PACKED_ICE: 212, CAMPFIRE: 213, STONE_SLAB: 214, OAK_SLAB: 215, GLASS_PANE: 216, SEAGRASS: 217,
+  OAK_DOOR: 219, OAK_DOOR_TOP: 220, OAK_DOOR_OPEN: 221, OAK_DOOR_OPEN_TOP: 222,
 };
 export const I = {
   STICK: 100, COAL: 101, IRON_INGOT: 102, GOLD_INGOT: 103, DIAMOND: 104, REDSTONE: 105, APPLE: 106,
@@ -196,7 +197,19 @@ def(210, { name: 'Ladder', tex: 'ladder', solid: false, opaque: false, cutout: t
 def(211, { name: 'Cobweb', tex: 'cobweb', solid: false, opaque: false, cutout: true, filter: 0, shape: 'cross', hardness: 4, tool: 'sword', drop: I.STRING });
 def(212, { name: 'Packed Ice', tex: 'packed_ice', hardness: 0.5, tool: 'pickaxe' });
 def(213, { name: 'Campfire', tex: { top: 'campfire_top', bottom: 'oak_log_top', side: 'campfire_side' }, opaque: false, filter: 0, shape: 'slab', light: 15, hardness: 2, tool: 'axe', drop: I.COAL });
+def(214, { name: 'Stone Slab', tex: { top: 'smooth_stone', bottom: 'smooth_stone', side: 'smooth_stone' }, shape: 'slab', opaque: false, filter: 0, hardness: 2, tool: 'pickaxe', tier: 1 });
+def(215, { name: 'Oak Slab', tex: 'planks', shape: 'slab', opaque: false, filter: 0, hardness: 2, tool: 'axe' });
+def(216, { name: 'Glass Pane', tex: 'glass', shape: 'pane', opaque: false, cutout: true, filter: 0, cullSame: true, hardness: 0.3 });
+def(217, { name: 'Seagrass', tex: 'seagrass', solid: false, opaque: false, filter: 0, shape: 'cross', hardness: 0 });
 def(197, { name: 'Planter', tex: { top: 'grass_top', bottom: 'concrete_gray', side: 'planter_side' }, hardness: 1.5, ...pk });
+// vending machines stand two blocks tall: the top half is placed with the machine
+def(218, { name: 'Vending Machine Top', tex: { top: 'steel', bottom: 'steel', side: 'vend_top_side', front: 'vend_top_front' }, light: 8, hardness: 2.5, drop: 0, creative: false, ...pk });
+// oak doors: bottom + top halves, closed or swung open (open doors are walk-through)
+const doorTex = (t) => ({ top: t, bottom: t, side: t });
+def(219, { name: 'Oak Door', tex: doorTex('door_lower'), shape: 'door', opaque: false, filter: 0, hardness: 2, tool: 'axe' });
+def(220, { name: 'Oak Door', tex: doorTex('door_upper'), shape: 'door', opaque: false, filter: 0, hardness: 2, tool: 'axe', drop: 0, creative: false });
+def(221, { name: 'Oak Door', tex: doorTex('door_lower'), shape: 'door', opaque: false, solid: false, filter: 0, hardness: 2, tool: 'axe', drop: 219, creative: false });
+def(222, { name: 'Oak Door', tex: doorTex('door_upper'), shape: 'door', opaque: false, solid: false, filter: 0, hardness: 2, tool: 'axe', drop: 0, creative: false });
 
 export const ITEMS = {};
 const it = (id, name, o = {}) => (ITEMS[id] = Object.assign({ id, name, stack: 64 }, o));
@@ -252,10 +265,10 @@ export const maxDur = (id) => ITEMS[id] && ITEMS[id].dur ? ITEMS[id].dur : 0;
 export const CREATIVE_LIST = [
   1, 2, 3, 4, 48, 5, 6, 7, 31, 42, 8, 21, 23, 10, 9, 22, 24, 12, 19, 47, 18, 20, 13, 14, 15, 16, 17, 57, 43, 44, 45,
   74, 73, 93, 94, 40, 77, 78, 79, 96, 80, 84, 81, 83, 85, 86, 87, 88, 89, 91, 95, 92, 29, 30, 70, 66, 67, 68, 69, 75, 76, 58, 59, 64, 65, 71, 72, 63, 41, 35, 49, 50, 51, 52, 53, 25, 26, 27, 28, 38, 46, 56, 36, 37, 32, 33, 34, 55,
-  97, 201, 199, 200, 202, 203, 204, 205, 98, 30, 206, 207, 208, 170, 171, 172, 173, 174, 175, 176, 195, 196, 177, 194, 197, 178, 179, 180, 181, 182, 183, 184, 185, 186, 187, 188, 189, 190, 191, 192, 193,
+  97, 201, 199, 200, 202, 203, 204, 205, 98, 206, 207, 208, 170, 171, 172, 173, 174, 175, 176, 195, 196, 177, 194, 197, 178, 179, 180, 181, 182, 183, 184, 185, 186, 187, 188, 189, 190, 191, 192, 193,
   I.SMARTPHONE, I.CAR, I.DRONE, I.CIRCUIT, I.BATTERY,
   I.EYE_OF_ENDER, I.ENDER_PEARL, I.ELYTRA, I.FIREWORK, I.BOW, I.ARROW, I.STRING, I.FEATHER, I.EGG, I.RAW_CHICKEN, I.COOKED_CHICKEN, I.CHORUS_FRUIT,
-  210, 209, 211, 212, 213, I.COMPASS, I.CLOCK, I.BOAT, I.SHEARS, I.FISHING_ROD, I.RAW_COD, I.COOKED_COD, I.SLIME_BALL, I.SHIELD, I.MILK_BUCKET,
+  210, 209, 211, 212, 213, 214, 215, 216, 217, 219, I.COMPASS, I.CLOCK, I.BOAT, I.SHEARS, I.FISHING_ROD, I.RAW_COD, I.COOKED_COD, I.SLIME_BALL, I.SHIELD, I.TRIDENT, I.MILK_BUCKET,
   ...[0, 1, 2, 3, 4].flatMap((m) => [0, 1, 2, 3].map((p) => armorId(m, p))),
   I.STICK, I.COAL, I.EMERALD, I.LAPIS, I.BOOK, I.PAPER, I.LEATHER, I.QUARTZ, I.GOLD_NUGGET, I.BLAZE_ROD, I.BLAZE_POWDER, I.GHAST_TEAR, I.MAGMA_CREAM, I.NETHER_BRICK, I.SEEDS, I.WHEAT, I.HOE, I.IRON_INGOT, I.GOLD_INGOT, I.DIAMOND, I.REDSTONE, I.FLINT, I.FLINT_STEEL, I.BUCKET, I.WATER_BUCKET, I.LAVA_BUCKET, I.GUNPOWDER, I.BONE,
   I.APPLE, I.BREAD, I.RAW_PORK, I.COOKED_PORK, I.RAW_BEEF, I.STEAK, I.RAW_MUTTON, I.COOKED_MUTTON, I.ROTTEN_FLESH,
@@ -297,6 +310,9 @@ shaped(['P P', 'PPP'], { P: 10 }, I.BOAT);
 shaped([' I', 'I '], { I: I.IRON_INGOT }, I.SHEARS);
 shaped(['  S', ' ST', 'S T'], { S: I.STICK, T: I.STRING }, I.FISHING_ROD);
 shaped(['PIP', 'PPP', ' P '], { P: 10, I: I.IRON_INGOT }, I.SHIELD);
+shaped(['SSS', 'SSS'], { S: 3 }, 214, 6);
+shaped(['PPP'], { P: 10 }, 215, 6);
+shaped(['PP', 'PP', 'PP'], { P: 10 }, 219, 3);
 for (const [m, mat] of [[0, I.LEATHER], [1, I.IRON_INGOT], [2, I.GOLD_INGOT], [3, I.DIAMOND]]) {
   shaped(['XXX', 'X X'], { X: mat }, armorId(m, 0)); shaped(['X X', 'XXX', 'XXX'], { X: mat }, armorId(m, 1));
   shaped(['XXX', 'X X', 'X X'], { X: mat }, armorId(m, 2)); shaped(['X X', 'X X'], { X: mat }, armorId(m, 3));
@@ -327,6 +343,7 @@ shaped(['MM', ' S', ' S'], { M: 10, S: I.STICK }, I.HOE);
 shaped(['MM', ' S', ' S'], { M: 4, S: I.STICK }, I.HOE);
 shaped(['PSP', 'PSP'], { P: 10, S: I.STICK }, 72, 3);
 shaped(['GGG', 'GCG', 'GGG'], { G: 12, C: I.COAL }, 76, 8);
+shaped(['GGG', 'GGG'], { G: 12 }, 216, 16);
 shaped(['SSS'], { S: 3 }, 70, 3);
 shaped(['GSG', 'SCS', 'GSG'], { G: 12, S: 6, C: I.COAL }, 71, 2);
 shapeless([6, 7, 35], 66, 8); shapeless([6, 7, I.COAL], 68, 8); shapeless([6, 7], 67, 8); shapeless([6, 7, 52], 69, 8);

@@ -1,4 +1,4 @@
-// Mine Craft — full-screen world map with players, homes, towns and fast travel
+// VoxCraft — full-screen world map with players, homes, towns and fast travel
 const BIOME_COL = { 0: [104, 160, 64], 1: [62, 122, 46], 2: [219, 204, 140], 3: [228, 236, 242], 4: [128, 128, 128], 5: [44, 92, 168], 6: [226, 214, 160] };
 const SEA = 28, TILE = 64;
 const $ = (id) => document.getElementById(id);

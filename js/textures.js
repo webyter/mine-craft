@@ -170,6 +170,20 @@ export function buildAtlas() {
   newTile('sandstone', (P) => { for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) { let c = vary([216, 202, 155], 0.06, P.rnd); if (y < 3) c = vary([226, 214, 170], 0.04, P.rnd); if (y === 3 || y === 12) c = [190, 174, 124]; P.set(x, y, c); } });
   newTile('sandstone_top', (P) => P.noise([222, 208, 162], 0.06));
   newTile('tall_grass', (P) => plant(P, () => { for (let b = 0; b < 7; b++) { const x = 1 + Math.floor(P.rnd() * 14); const h = 5 + Math.floor(P.rnd() * 9); for (let y = 0; y < h; y++) P.set(x + (y > h * 0.6 ? (b % 2 ? 1 : -1) : 0), 15 - y, vary([92, 160, 56], 0.2, P.rnd)); } }));
+  newTile('seagrass', (P) => plant(P, () => {
+    // soft olive-green ribbons, gently curved, a mix of tall and short blades
+    for (let b = 0; b < 9; b++) {
+      const base = 1 + Math.floor(P.rnd() * 14);
+      const h = 6 + Math.floor(P.rnd() * 10);
+      const lean = P.rnd() < 0.5 ? 1 : -1;
+      for (let y = 0; y < h; y++) {
+        const sway = Math.sin(y / h * Math.PI) > 0.55 ? lean : 0;
+        const col = y > h - 3 ? [96, 178, 128] : vary(y > h * 0.55 ? [58, 150, 108] : [40, 124, 92], 0.16, P.rnd);
+        P.set(base + sway, 15 - y, col);
+        if (y < h * 0.35) P.set(base + sway + lean, 15 - y, [34, 108, 80]);
+      }
+    }
+  }));
   newTile('dandelion', (P) => plant(P, () => { for (let y = 9; y < 16; y++) P.set(7, y, [70, 130, 40]); P.set(6, 12, [70, 130, 40]); P.set(8, 11, [70, 130, 40]); for (const [x, y] of [[6, 6], [7, 6], [8, 6], [6, 7], [7, 7], [8, 7], [7, 5], [6, 8], [7, 8], [8, 8], [5, 7], [9, 7]]) P.set(x, y, [250, 220, 40]); P.set(7, 7, [220, 160, 20]); }));
   newTile('poppy', (P) => plant(P, () => { for (let y = 9; y < 16; y++) P.set(7, y, [70, 130, 40]); P.set(8, 12, [70, 130, 40]); P.set(9, 11, [70, 130, 40]); for (const [x, y] of [[6, 5], [7, 5], [8, 5], [5, 6], [6, 6], [7, 6], [8, 6], [9, 6], [5, 7], [6, 7], [8, 7], [9, 7], [6, 8], [7, 8], [8, 8]]) P.set(x, y, [220, 30, 30]); P.set(7, 7, [30, 30, 20]); }));
   newTile('dead_bush', (P) => plant(P, () => { const br = [[7, 15], [7, 14], [7, 13], [6, 12], [5, 11], [4, 10], [8, 12], [9, 11], [10, 10], [11, 9], [7, 11], [7, 10], [7, 9], [6, 8], [8, 8], [3, 9], [12, 8]]; for (const [x, y] of br) P.set(x, y, [130, 96, 50]); }));
@@ -275,6 +289,11 @@ export function buildAtlas() {
   newTile('ac_top', (P) => { P.noise([200, 202, 206], 0.03); for (let x = 2; x < 14; x += 2) for (let y = 2; y < 14; y++) P.set(x, y, [90, 92, 96]); });
   newTile('vend_side', (P) => { P.noise([200, 30, 40], 0.04); for (let y = 2; y < 6; y++) for (let x = 2; x < 14; x++) P.set(x, y, [255, 255, 255]); for (let x = 3; x < 13; x++) P.set(x, 4, [200, 30, 40]); });
   newTile('vend_front', (P) => { P.noise([200, 30, 40], 0.04); for (let y = 1; y < 12; y++) for (let x = 1; x < 11; x++) P.set(x, y, [170, 220, 240]); const cols = [[255, 60, 60], [60, 120, 255], [60, 220, 90], [255, 200, 40]]; for (let r = 0; r < 4; r++) for (let x = 2; x < 10; x += 2) { P.set(x, 2 + r * 3, cols[(x + r) % 4]); P.set(x, 3 + r * 3, cols[(x + r) % 4]); } for (let y = 3; y < 9; y++) P.set(13, y, [30, 30, 34]); P.set(13, 4, [40, 255, 90]); for (let x = 2; x < 10; x++) P.set(x, 13, [20, 20, 22]); });
+  newTile('vend_top_front', (P) => { P.noise([200, 30, 40], 0.04); for (let x = 1; x < 11; x++) { P.set(x, 0, [255, 255, 255]); P.set(x, 1, [240, 240, 245]); } for (let y = 3; y < 14; y++) for (let x = 1; x < 11; x++) P.set(x, y, [190, 226, 244]); const cols = [[255, 60, 60], [60, 120, 255], [60, 220, 90], [255, 200, 40]]; for (let r = 0; r < 4; r++) for (let x = 2; x < 10; x += 2) { P.set(x, 4 + r * 3, cols[(x + r + 1) % 4]); P.set(x, 5 + r * 3, cols[(x + r + 1) % 4]); } for (let y = 3; y < 11; y++) P.set(13, y, [30, 30, 34]); P.set(13, 5, [40, 255, 90]); });
+  newTile('vend_top_side', (P) => { P.noise([200, 30, 40], 0.04); for (let y = 0; y < 2; y++) for (let x = 2; x < 14; x++) P.set(x, y, [255, 255, 255]); for (let y = 4; y < 12; y++) for (let x = 3; x < 13; x++) P.set(x, y, [180, 40, 50]); for (let x = 3; x < 13; x++) P.set(x, 7, [255, 255, 255]); });
+  newTile('door_lower', (P) => { planks(P, [172, 132, 84]); for (let y = 3; y < 15; y++) for (let x = 3; x < 13; x++) { const edge = x === 3 || x === 12 || y === 3 || y === 14; P.set(x, y, edge ? [124, 88, 50] : vary([196, 156, 104], 0.05, P.rnd)); } for (let y = 6; y < 12; y++) P.set(11, y, [70, 70, 76]); P.set(11, 9, [214, 214, 224]); });
+  newTile('door_upper', (P) => { planks(P, [172, 132, 84]); for (let y = 1; y < 12; y++) for (let x = 3; x < 13; x++) { const edge = x === 3 || x === 12 || y === 1 || y === 11; P.set(x, y, edge ? [124, 88, 50] : vary([152, 198, 222], 0.07, P.rnd)); } for (let x = 6; x < 10; x++) { P.set(x, 4, [232, 246, 255]); P.set(x, 8, [232, 246, 255]); } });
+
   newTile('atm_side', (P) => { P.noise([120, 126, 134], 0.04); frame(P, [80, 84, 90]); });
   newTile('atm_front', (P) => { P.noise([120, 126, 134], 0.04); for (let y = 2; y < 7; y++) for (let x = 3; x < 13; x++) P.set(x, y, [40, 140, 90]); for (let x = 4; x < 9; x++) P.set(x, 3, [200, 255, 220]); for (let r = 0; r < 3; r++) for (let c = 0; c < 3; c++) P.set(5 + c * 2, 9 + r * 2, [220, 220, 224]); for (let x = 4; x < 12; x++) P.set(x, 8, [20, 20, 20]); for (let i = 0; i < 16; i++) P.set(i, 0, [30, 90, 200]); });
   newTile('ev_side', (P) => { P.noise([236, 238, 240], 0.03); for (let y = 2; y < 7; y++) for (let x = 4; x < 12; x++) P.set(x, y, [30, 34, 40]); for (let x = 5; x < 11; x++) P.set(x, 4, [60, 230, 120]); for (let y = 9; y < 14; y++) P.set(7, y, [20, 20, 22]); P.set(8, 12, [60, 160, 255]); for (let x = 0; x < 16; x++) P.set(x, 15, [60, 160, 255]); });
@@ -354,107 +373,160 @@ function blockIcon(id) {
 }
 
 const TOOL_SHAPES = {
-  pickaxe: ['................', '....hhhhhhh.....', '...hhhhhhhhh....', '..hh....s..hh...', '..h....s....hh..', '......s......h..', '.....s..........', '....s...........', '...s............', '..s.............', '.s..............'],
-  axe: ['................', '........hhh.....', '.......hhhhh....', '......hhhhhs....', '......hhhhs.....', '.......hhs......', '........s.......', '.......s........', '......s.........', '.....s..........', '....s...........', '...s............', '..s.............'],
-  shovel: ['................', '...........hhh..', '..........hhhhh.', '..........hhhhh.', '...........hhh..', '..........s.....', '.........s......', '........s.......', '.......s........', '......s.........', '.....s..........', '....s...........', '...s............', '..s.............'],
-  sword: ['................', '............hhh.', '...........hhhh.', '..........hhhh..', '.........hhhh...', '........hhhh....', '.......hhhh.....', '..g...hhhh......', '...g.hhhh.......', '....ghhh........', '....sg..........', '...s..g.........', '..s.............', '.ss.............'],
+  pickaxe: ['................', '.....hhhhhhh....', '...hhaaaaaahh...', '..haa.....aah...', '..ha.......ah...', '..........ss....', '.........ss.....', '........ss......', '.......ss.......', '......ss........', '.....ss.........', '....ss..........', '...ss...........', '..ss............', '.ss.............', '................'],
+  axe: ['................', '........hhhh....', '.......haaaah...', '......haaaahh...', '.....haaaah.....', '....haaah..s....', '....haah..ss....', '.....hh..ss.....', '........ss......', '.......ss.......', '......ss........', '.....ss.........', '....ss..........', '...ss...........', '..ss............', '................'],
+  shovel: ['................', '..........hh....', '.........haah...', '.........haah...', '........haaah...', '.........ss.....', '........ss......', '.......ss.......', '......ss........', '.....ss.........', '....ss..........', '...ss...........', '..ss............', '.ss.............', 'ss..............', '................'],
+  sword: ['................', '............hh..', '...........haah.', '..........haah..', '.........haah...', '........haah....', '.......haah.....', '..ggg.haah......', '..gggghaah......', '...gg.ss........', '..sgg.ss........', '.ss.............', '.ss.............', '.ss.............', 'ss..............', '................'],
+};
+const ARMOR_SHAPES = [
+  ['................', '................', '....mmmmmmmm....', '...mhhhhhhhhm...', '..mhhhhhhhhhhm..', '..mhhhhhhhhhhm..', '..mhhmmmmmmhhm..', '..mhhm....mhhm..', '..mhhm....mhhm..', '..mmmm....mmmm..', '..mmmmmmmmmmmm..', '..mmmm....mmmm..', '..mmmmmmmmmmmm..', '...mmmmmmmmmm...', '................', '................'],
+  ['................', '..mm........mm..', '..mmm......mmm..', '..mmmmmmmmmmmm..', '..mmhhhhhhhhmm..', '..mmhhhhhhhhmm..', '..mmhhhhhhhhmm..', '..mmhhhhhhhhmm..', '..mmhhhhhhhhmm..', '..mmhhhhhhhhmm..', '..mmhhhhhhhhmm..', '..mmmmmmmmmmmm..', '..mmmmmmmmmmmm..', '...mmmmmmmmmm...', '................', '................'],
+  ['................', '..mmmmmmmmmmmm..', '..mmmmmmmmmmmm..', '..mmhhhhhhhhmm..', '..mmhhhhhhhhmm..', '..mmmmmmmmmmmm..', '..mmm......mmm..', '..mm........mm..', '..mm........mm..', '..mm........mm..', '..mm........mm..', '..mm........mm..', '..mm........mm..', '.mmmm......mmmm.', '................', '................'],
+  ['................', '................', '................', '..mmm....mmm....', '..mmm....mmm....', '..mmm....mmm....', '..mmm....mmm....', '..mmm....mmm....', '..mmmm..mmmm....', '..mmmmmmmmmmm...', '..mmmmmmmmmmm...', '.mmhhhhhhhhmm...', '.mmmmmmmmmmmm...', '................', '................', '................'],
+];
+// hex mix for highlight / shadow shades
+function mix(c1, c2, k) {
+  const p = (h) => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
+  const a = p(c1), b = p(c2);
+  return '#' + a.map((v, i) => Math.round(v + (b[i] - v) * k).toString(16).padStart(2, '0')).join('');
+}
+// hand-drawn pixel art for the special items (16x16 maps)
+const ART_ROWS = {
+  compass: ['................', '.mmmmmmmmmmmmmm.', '.mffffffffffffm.', '.mffffffffffffm.', '.mfffrrrffffffm.', '.mmfrrrrffffffm.', '.mffffrrffffggm.', '.mfffffffffggfm.', '.mffffffffffffm.', '.mffffffffffffm.', '.mmmmmmmmmmmmmm.', '..mmmmmmmmmmmm..', '...mmmmmmmmmm...', '.....mmmmmm.....', '................', '................'],
+  clock: ['................', '.oooooooooooooo.', '.oyyyyyyyyyyyyo.', '.oyyyyyyyyyykko.', '.oyyyyyyyyyykko.', '.oyywwwwwyyykko.', '.oyywwwwwyyykko.', '.oyywwwwwyyykko.', '.oyywwwwwyyykko.', '.oyyyyyyyyyykko.', '.oyyyyyyyyyykko.', '.oooooooooooooo.', '................', '................', '................', '................'],
+  boat: ['................', '................', '................', '...ss......ss...', '..ssss....ssss..', '..ssssssssssss..', '.ssssssssssssss.', '.saaaaaaaaaaaaa.', '.saaaaaaaaaaaaa.', '.saaaaaaaaaaaaa.', '..ssssssssssss..', '...ssssssssss...', '................', '................', '................', '................'],
+  shears: ['................', '................', '....mm....mm....', '....mmm..mmm....', '.....mmmmmmm....', '.....mmmmmmm....', '......mmmmm.....', '.......mmm......', '.......mmk......', '......mmkmm.....', '.....mrk..rm....', '....mr......rm..', '....r........r..', '................', '................', '................'],
+  rod: ['................', '..............ss', '.............ss.', '............ss..', '...........ss...', '..........ss....', '.........ss.....', '........ss......', '.......ss.......', '......ss........', '.....ss.........', '....ss..........', '...ss...........', '..ww............', '..ww............', '................'],
+  shield: ['................', '..mmmmmmmmmmmm..', '..mhhhhhhhhhhm..', '..mhhmmmmmmhhm..', '..mhhmhhhhmhhm..', '..mhhmhhhhmhhm..', '..mhhmhhhhmhhm..', '..mhhmhhhhmhhm..', '..mhhmhhhhmhhm..', '..mhhmmmmmmhhm..', '..mhhhhhhhhhhm..', '...mmhhhhhhm....', '....mmhhhhm.....', '.....mmhhm......', '.....mmmm.......', '......mm........'],
+  trident: ['................', '.........cccc...', '.........c..c...', '.........cccc...', '.........c..c...', '.........cccc...', '........ss......', '.......ss.......', '......ss........', '.....ss.........', '....ss..........', '...ss...........', '..ss............', '.ss.............', '................', '................'],
+  elytra: ['................', '.....mm...mm....', '....mmmm.mmmm...', '...mmmmmmmmmmm..', '..mmhhmmmmmhhm..', '..mmhhmmmmmhhm..', '..mmhhmmmmmmhm..', '..mmhhmmmmmmmm..', '..mmmmmmmmmmmm..', '...mmmmmmmmmm...', '....mmmmmmmm....', '.....mmmmmm.....', '......mmmm......', '................', '................', '................'],
+  eye: ['................', '................', '....cccccccc....', '..cccccccccccc..', '.ccchhhhhhhhccc.', '.cchhhkkkkhhccc.', '.ccchhhkkkhhccc.', '.cccchhhhhhcccc.', '.cccchhhhhhcccc.', '..cccccccccccc..', '....cccccccc....', '................', '................', '................', '................', '................'],
+  pearl: ['................', '................', '....cccccccc....', '..cccccccccccc..', '.cccchhhhcccccc.', '.cccchhhcccccc..', '.cccchhhcccccc..', '.cccchhhhcccccc.', '.cccccccccccccc.', '..cccccccccccc..', '....cccccccc....', '................', '................', '................', '................', '................'],
+  phone: ['................', '.....kkkkkk.....', '....kkhhhhkk....', '....khhhhhkk....', '....khccchkk....', '....khccchkk....', '....khccchkk....', '....khccchkk....', '....khccchkk....', '....khccchkk....', '....khhhhhkk....', '....khhhhhkk....', '....kkkkkkkk....', '.....kkkkkk.....', '................', '................'],
+  car: ['................', '................', '......hhhhh.....', '.....hhccchh....', '.....hhccchh....', '.....hhccchh....', '....rrrrrrrrr...', '...rrrrrrrrrrr..', '..rrrrrrrrrrrr..', '..rrrrrrrrrrrr..', '..rrrrrrrrrrrr..', '...kk....kk.....', '..kkkk..kkkk....', '..ww....ww......', '................', '................'],
+  circuit: ['................', '..gggggggggggg..', '..gyyyyyyyyyyg..', '..gykkkkkkkkyg..', '..gykhhhhhhkyg..', '..gykkkkkkkkyg..', '..gyyyyyyyyyyg..', '..gykkkgykkkyg..', '..gykkkgykkkyg..', '..gyyyyyyyyyyg..', '..gykkkgyyyeyg..', '..gykkkgyyyeyg..', '..gggggggggggg..', '................', '................', '................'],
+  battery: ['................', '.....gggggg.....', '.....ghhhhg.....', '....gggggggg....', '....gyyyyyyg....', '....gyeeeeeg....', '....gyeeeeeg....', '....gyeeeeeg....', '....gyeeeeeg....', '....gyeeeeeg....', '....gyeeeeeg....', '....gyyyyyyg....', '....gggggggg....', '.....gggggg.....', '................', '................'],
+  drone: ['................', '................', '..gg........gg..', '...gg......gg...', '....mmmmmmmm....', '....mhhhhhhm....', '....mhhhhchm....', '....mmmmmmmm....', '.....gggggg.....', '......gmmg......', '......gmmg......', '.......kk.......', '.......kk.......', '................', '................', '................'],
+  firework: ['................', '.......rr.......', '.......rr.......', '......rrrr......', '.......rr.......', '......swws......', '......ssss......', '.....ssssss.....', '....ssssssss....', '....ssssssss....', '.....ssssss.....', '......ssss......', '.....ss..ss.....', '....ss....ss....', '...ss......ss...', '................'],
+  egg: ['................', '.....cccccc.....', '....cccccccc....', '...cchhcccccc...', '...chhccccccc...', '...chhccccccc...', '...cccccccccc...', '...cccccccccc...', '...cccccccccc...', '....cccccccc....', '.....cccccc.....', '................', '................', '................', '................', '................'],
+  feather: ['................', '...........ww...', '..........wwww..', '.........wwwww..', '........wwwwws..', '.......wwwwws...', '......wwwwws....', '.....wwwws......', '.....wwws.......', '....wwws........', '....wws.........', '...ws...........', '...s............', '..s.............', '................', '................'],
+  cod: ['................', '................', '......mmmm......', '....mmmmmmmm....', '..mmmmmmmmmmmm..', '.mmmhhmmmmmmmmk.', '.mmmhhmmmmmmmd..', '.mmmmmmmmmmmm...', '.mmmmmmmmmmmd...', '..mmmmmmmmmm....', '....mmmmmm......', '................', '................', '................', '................', '................'],
+  slime: ['................', '.eeeeeeeeeeeeee.', '.eeeeeeeeeeeeee.', '.eeehhhheeeeeee.', '.eeehhhheeeeeee.', '.eeehhhheeeeeee.', '.eeeeeeeeeeeeee.', '.eeeeeeeeeeeeee.', '.eeeeeeeeeeeeee.', '.eeeeeeeeeeeeee.', '.eeeeeeeeeeeeee.', '..eeeeeeeeeeee..', '...eeeeeeeeee...', '.....eeeeee.....', '................', '................'],
+  bucket: ['................', '.mmmmmmmmmmmmmm.', '.mmmmmmmmmmmmmm.', '..mxxxxxxxxxxxm.', '..mxxxxxxxxxxxm.', '..mmxxxxxxxxmm..', '..mmmmmmmmmmmm..', '..mmmmmmmmmmmm..', '..mmmmmmmmmmmm..', '..mmmmmmmmmmmm..', '...mmmmmmmmmm...', '....mmmmmmmm....', '................', '................', '................', '................'],
+  hoe: ['................', '.......mmmm.....', '......mhhhmm....', '......mm..s.....', '.........ss.....', '........ss......', '.......ss.......', '......ss........', '.....ss.........', '....ss..........', '...ss...........', '..ss............', '.ss.............', '................', '................', '................'],
+};
+const ART = {
+  [I.COMPASS]: { rows: ART_ROWS.compass, cols: { m: '#7a7a7a', f: '#d8d8d0', r: '#d02020', g: '#606060' } },
+  [I.CLOCK]: { rows: ART_ROWS.clock, cols: { o: '#c09020', y: '#f8e0a0', w: '#5aa0e0', k: '#1a2a50' } },
+  [I.BOAT]: { rows: ART_ROWS.boat, cols: { s: '#7a5a30', a: '#9c7a48' } },
+  [I.SHEARS]: { rows: ART_ROWS.shears, cols: { m: '#d8d8d8', k: '#222222', r: '#c03030' } },
+  [I.FISHING_ROD]: { rows: ART_ROWS.rod, cols: { s: '#8a6232', w: '#e8e8e8' } },
+  [I.SHIELD]: { rows: ART_ROWS.shield, cols: { m: '#9c7a48', h: '#c8a860', d: '#6b4a24' } },
+  [I.TRIDENT]: { rows: ART_ROWS.trident, cols: { c: '#3a8a8a', s: '#8a6232' } },
+  [I.ELYTRA]: { rows: ART_ROWS.elytra, cols: { m: '#8a8aa8', h: '#c8c8e0' } },
+  [I.EYE_OF_ENDER]: { rows: ART_ROWS.eye, cols: { c: '#1d6a50', h: '#7ae0a8', k: '#0a1a14' } },
+  [I.ENDER_PEARL]: { rows: ART_ROWS.pearl, cols: { c: '#0e3a34', h: '#9af0e0' } },
+  [I.SMARTPHONE]: { rows: ART_ROWS.phone, cols: { k: '#1a1a1a', h: '#3a3a44', c: '#3a8ae8' } },
+  [I.CAR]: { rows: ART_ROWS.car, cols: { r: '#d8202a', h: '#f0f0f0', c: '#9ad0ff', k: '#1a1a1a', w: '#8a8a8a' } },
+  [I.CIRCUIT]: { rows: ART_ROWS.circuit, cols: { g: '#1a7a3a', y: '#3ac05a', k: '#1a1a1a', h: '#3a3a44', e: '#e8c040' } },
+  [I.BATTERY]: { rows: ART_ROWS.battery, cols: { g: '#5a5a5a', h: '#8a8a8a', y: '#d8c83a', e: '#3ade6a' } },
+  [I.DRONE]: { rows: ART_ROWS.drone, cols: { g: '#5a5a5a', m: '#d8d8d8', h: '#f0f0f0', c: '#3a8ae8', k: '#2a2a2a' } },
+  [I.FIREWORK]: { rows: ART_ROWS.firework, cols: { r: '#d02a2a', w: '#f0e0c0', s: '#e8e0d0' } },
+  [I.EGG]: { rows: ART_ROWS.egg, cols: { c: '#e8dcc0', h: '#fff8e8' } },
+  [I.FEATHER]: { rows: ART_ROWS.feather, cols: { w: '#f4f4f4', s: '#bbbbbb' } },
+  [I.RAW_COD]: { rows: ART_ROWS.cod, cols: { m: '#b0a080', h: '#d8c8a8', d: '#8a7a5a', k: '#111111' } },
+  [I.COOKED_COD]: { rows: ART_ROWS.cod, cols: { m: '#a06a3a', h: '#c8904a', d: '#6a4a2a', k: '#111111' } },
+  [I.SLIME_BALL]: { rows: ART_ROWS.slime, cols: { e: '#5aa848', h: '#8ad870' } },
+  [I.BUCKET]: { rows: ART_ROWS.bucket, cols: { m: '#c8c8c8', h: '#fafafa', x: '#5a5a5a' } },
+  [I.WATER_BUCKET]: { rows: ART_ROWS.bucket, cols: { m: '#c8c8c8', h: '#fafafa', x: '#3a6ae8' } },
+  [I.LAVA_BUCKET]: { rows: ART_ROWS.bucket, cols: { m: '#c8c8c8', h: '#fafafa', x: '#ff7a10' } },
+  [I.MILK_BUCKET]: { rows: ART_ROWS.bucket, cols: { m: '#c8c8c8', h: '#fafafa', x: '#fafafa' } },
+  [I.HOE]: { rows: ART_ROWS.hoe, cols: { m: '#9a9a9a', h: '#c8c8c8', s: '#8a6232' } },
+  [I.BOW]: { rows: ['..........sss...', '.........s..f...', '........s...f...', '.......s....f...', '......s.....f...', '.....s......f...', '....s.......f...', '...s........f...', '..s........f....', '.s........f.....', '.s.......f......', '.s......f.......', '.s.....f........', '..sssff.........', '................', '................'], cols: { s: '#7a5228', f: '#e8e8e8' } },
 };
 function drawMap(g, rows, colors) {
   const filled = new Set();
-  rows.forEach((r, y) => [...r].forEach((ch, x) => { if (ch !== '.') { g.fillStyle = colors[ch]; g.fillRect(x + 1, y + 1, 1, 1); filled.add((x + 1) + ',' + (y + 1)); } }));
-  // outline
+  rows.forEach((r, y) => [...r].forEach((ch, x) => { if (ch !== '.' && colors[ch]) { g.fillStyle = colors[ch]; g.fillRect(x + 1, y + 1, 1, 1); filled.add((x + 1) + ',' + (y + 1)); } }));
+  // soft outline around the silhouette
   g.fillStyle = 'rgba(20,16,12,0.9)';
   for (let y = 0; y < 18; y++) for (let x = 0; x < 18; x++) {
     if (filled.has(x + ',' + y)) continue;
     if (filled.has((x + 1) + ',' + y) || filled.has((x - 1) + ',' + y) || filled.has(x + ',' + (y + 1)) || filled.has(x + ',' + (y - 1))) g.fillRect(x, y, 1, 1);
   }
 }
+// material items: generated blobs with automatic top-left highlight and bottom-right shadow
 function blob(g, colA, colB, seed, shape = 'round') {
-  const r = mulberry32(seed); const rows = [];
+  const r = mulberry32(seed); const inside = [];
   for (let y = 0; y < 14; y++) {
     let s = '';
     for (let x = 0; x < 14; x++) {
       const dx = x - 6.5, dy = y - 6.5;
-      let inside;
-      if (shape === 'round') inside = dx * dx + dy * dy < 30 + r() * 6;
-      else if (shape === 'ingot') inside = y > 4 && y < 10 && x > (9 - y) && x < 13 - (9 - y) + 1 + (y - 5);
-      else if (shape === 'gem') inside = Math.abs(dx) + Math.abs(dy) * 1.3 < 6.5 && dy > -4.5;
-      else if (shape === 'meat') inside = (dx * dx) / 36 + (dy * dy) / 16 < 1 && !(x < 3 && y > 7);
-      else if (shape === 'pile') inside = y > 6 && Math.abs(dx) < (y - 5) * 1.1 && y < 13;
-      else if (shape === 'shard') inside = Math.abs(dx - dy * 0.4) < 3 && Math.abs(dy) < 6;
-      else if (shape === 'stick') inside = Math.abs(x - (13 - y)) < 1 && y > 1 && y < 13;
-      else if (shape === 'bone') inside = Math.abs(x - (13 - y)) < 1.2 && y > 1 && y < 13 || ((x - 2) ** 2 + (y - 11) ** 2 < 3) || ((x - 11) ** 2 + (y - 2) ** 2 < 3);
-      else if (shape === 'bucket') inside = y > 3 && y < 12 && Math.abs(dx) < 5.2 - (y - 3) * 0.25;
-      else if (shape === 'book') inside = x > 2 && x < 12 && y > 1 && y < 13;
-      else if (shape === 'paper') inside = x > 2 && x < 12 && y > 1 && y < 12 && !(x > 9 && y < 4);
-      else if (shape === 'nugget') inside = (dx * dx + dy * dy) < 9 + r() * 3;
-      else if (shape === 'loaf') inside = (dx * dx) / 42 + (dy * dy) / 10 < 1;
-      s += inside ? (r() < 0.3 ? 'b' : 'a') : '.';
+      let isIn;
+      if (shape === 'round') isIn = dx * dx + dy * dy < 30 + r() * 6;
+      else if (shape === 'ingot') isIn = y > 4 && y < 10 && x > (9 - y) && x < 13 - (9 - y) + 1 + (y - 5);
+      else if (shape === 'gem') isIn = Math.abs(dx) + Math.abs(dy) * 1.3 < 6.5 && dy > -4.5;
+      else if (shape === 'meat') isIn = (dx * dx) / 36 + (dy * dy) / 16 < 1 && !(x < 3 && y > 7);
+      else if (shape === 'pile') isIn = y > 6 && Math.abs(dx) < (y - 5) * 1.1 && y < 13;
+      else if (shape === 'shard') isIn = Math.abs(dx - dy * 0.4) < 3 && Math.abs(dy) < 6;
+      else if (shape === 'stick') isIn = Math.abs(x - (13 - y)) < 1 && y > 1 && y < 13;
+      else if (shape === 'bone') isIn = Math.abs(x - (13 - y)) < 1.2 && y > 1 && y < 13 || ((x - 2) ** 2 + (y - 11) ** 2 < 3) || ((x - 11) ** 2 + (y - 2) ** 2 < 3);
+      else if (shape === 'bucket') isIn = y > 3 && y < 12 && Math.abs(dx) < 5.2 - (y - 3) * 0.25;
+      else if (shape === 'book') isIn = x > 2 && x < 12 && y > 1 && y < 13;
+      else if (shape === 'paper') isIn = x > 2 && x < 12 && y > 1 && y < 12 && !(x > 9 && y < 4);
+      else if (shape === 'nugget') isIn = (dx * dx + dy * dy) < 9 + r() * 3;
+      else if (shape === 'loaf') isIn = (dx * dx) / 42 + (dy * dy) / 10 < 1;
+      s += isIn ? (r() < 0.2 ? 'b' : 'a') : '.';
     }
-    rows.push(s);
+    inside.push(s);
   }
-  drawMap(g, rows, { a: colA, b: colB });
+  const filled = (y, x) => y >= 0 && y < 14 && x >= 0 && x < 14 && inside[y][x] !== '.';
+  if (shape === 'stick' || shape === 'bone' || shape === 'shard') {
+    // thin shapes: shade the two ends instead of a rim
+    const rows = inside.map((s, y) => [...s].map((c) => (c === '.' ? '.' : y <= 4 ? 'h' : y >= 10 ? 'd' : c)).join(''));
+    drawMap(g, rows, { a: colA, b: colB, h: mix(colA, '#ffffff', 0.4), d: mix(colB, '#000000', 0.3) });
+    return;
+  }
+  const rows = inside.map((s, y) => [...s].map((c, x) => {
+    if (c === '.') return '.';
+    if (!filled(y - 1, x) || !filled(y, x - 1)) return 'h';
+    if (!filled(y + 1, x) || !filled(y, x + 1)) return 'd';
+    return c;
+  }).join(''));
+  drawMap(g, rows, { h: mix(colA, '#ffffff', 0.4), a: colA, b: colB, d: mix(colB, '#000000', 0.3) });
 }
 function itemIcon(id) {
   const c = document.createElement('canvas'); c.width = c.height = 18; const g = c.getContext('2d');
-  if (id === I.HOE) { drawMap(g, ['................', '.....hhhhh......', '.....hh..s......', '.........s......', '........s.......', '.......s........', '......s.........', '.....s..........', '....s...........', '...s............'], { h: '#8a8a8a', s: '#6b4a24' }); return c.toDataURL(); }
-  const R = (x, y, w, h, col) => { g.fillStyle = col; g.fillRect(x, y, w, h); };
-  if (id === I.SMARTPHONE) { R(5, 1, 8, 16, '#111'); R(6, 3, 6, 11, '#3a8ae8'); R(6, 3, 6, 3, '#7ac8ff'); R(7, 8, 2, 2, '#ff5a7a'); R(10, 8, 1, 2, '#5aff8a'); R(8, 15, 2, 1, '#666'); return c.toDataURL(); }
-  if (id === I.CAR) { R(2, 8, 14, 5, '#d8202a'); R(5, 4, 8, 5, '#d8202a'); R(6, 5, 3, 3, '#9ad0ff'); R(10, 5, 2, 3, '#9ad0ff'); R(3, 12, 4, 4, '#111'); R(11, 12, 4, 4, '#111'); R(4, 13, 2, 2, '#888'); R(12, 13, 2, 2, '#888'); R(15, 9, 1, 2, '#ffe080'); return c.toDataURL(); }
-  if (id === I.CIRCUIT) { R(2, 3, 14, 12, '#1a7a3a'); R(4, 5, 4, 4, '#222'); R(10, 9, 4, 4, '#222'); for (let k = 0; k < 6; k++) R(3 + k * 2, 14, 1, 2, '#e8c040'); R(8, 7, 6, 1, '#e8c040'); R(5, 10, 1, 4, '#e8c040'); return c.toDataURL(); }
-  if (id === I.BATTERY) { R(5, 3, 8, 13, '#2a2a2a'); R(7, 1, 4, 2, '#aaa'); R(5, 3, 8, 4, '#e8c040'); R(8, 9, 2, 5, '#fff'); R(7, 11, 4, 1, '#fff'); return c.toDataURL(); }
-  if (id === I.DRONE) { R(6, 7, 6, 4, '#ddd'); R(8, 11, 2, 2, '#222'); R(1, 6, 6, 1, '#555'); R(11, 6, 6, 1, '#555'); R(3, 7, 2, 2, '#888'); R(13, 7, 2, 2, '#888'); R(8, 8, 2, 1, '#3a8ae8'); return c.toDataURL(); }
-  if (id === I.EYE_OF_ENDER) { g.fillStyle = '#1d6a50'; g.beginPath(); g.arc(9, 9, 6.5, 0, 7); g.fill(); g.fillStyle = '#7ae0a8'; g.beginPath(); g.arc(9, 9, 4.5, 0, 7); g.fill(); g.fillStyle = '#0a1a14'; R(8, 5, 2, 8); return c.toDataURL(); }
-  if (id === I.ENDER_PEARL) { g.fillStyle = '#0e3a34'; g.beginPath(); g.arc(9, 9, 6.5, 0, 7); g.fill(); g.fillStyle = '#2a8a78'; g.beginPath(); g.arc(9, 9, 4.5, 0, 7); g.fill(); R(6, 6, 2, 2, '#9af0e0'); return c.toDataURL(); }
-  if (id === I.ELYTRA) { g.fillStyle = '#8a8aa8'; g.beginPath(); g.moveTo(8, 2); g.lineTo(2, 6); g.lineTo(3, 16); g.lineTo(8, 10); g.fill(); g.beginPath(); g.moveTo(10, 2); g.lineTo(16, 6); g.lineTo(15, 16); g.lineTo(10, 10); g.fill(); R(4, 7, 3, 1, '#c8c8e0'); R(11, 7, 3, 1, '#c8c8e0'); R(4, 11, 2, 1, '#5a5a78'); R(12, 11, 2, 1, '#5a5a78'); return c.toDataURL(); }
-  if (id === I.FIREWORK) { R(7, 6, 4, 10, '#d02a2a'); R(7, 8, 4, 2, '#f0e0c0'); R(8, 2, 2, 4, '#e8e0d0'); R(8, 16, 2, 2, '#6b4a24'); R(5, 1, 1, 1, '#ffe040'); R(12, 2, 1, 1, '#40c8ff'); return c.toDataURL(); }
-  if (id === I.BOW) { drawMap(g, ['..........sss...', '.........s..f...', '........s...f...', '.......s....f...', '......s.....f...', '.....s......f...', '....s.......f...', '...s........f...', '..s........f....', '.s........f.....', '.s.......f......', '.s......f.......', '.s.....f........', '..sssff.........'], { s: '#7a5228', f: '#dddddd' }); return c.toDataURL(); }
-  if (id === I.EGG) { g.fillStyle = '#e8dcc0'; g.beginPath(); g.ellipse(9, 10, 5, 6.5, 0, 0, 7); g.fill(); R(6, 7, 2, 2, '#fff8e8'); return c.toDataURL(); }
-  if (id === I.FEATHER) { drawMap(g, ['...........ww...', '..........www...', '.........wwww...', '........wwwws...', '.......wwwws....', '......wwwws.....', '.....wwwws......', '....wwwws.......', '....wwws........', '.....ws.........', '....s...........', '...s............'], { w: '#f4f4f4', s: '#bbb' }); return c.toDataURL(); }
-  if (id === I.COMPASS) { g.fillStyle = '#7a7a7a'; g.beginPath(); g.arc(9, 9, 7, 0, 7); g.fill(); g.fillStyle = '#d8d8d0'; g.beginPath(); g.arc(9, 9, 5.5, 0, 7); g.fill(); R(8, 4, 2, 5, '#d02020'); R(8, 9, 2, 5, '#606060'); return c.toDataURL(); }
-  if (id === I.CLOCK) { g.fillStyle = '#c09020'; g.beginPath(); g.arc(9, 9, 7, 0, 7); g.fill(); g.fillStyle = '#5aa0e0'; g.beginPath(); g.arc(9, 9, 5.5, 0, Math.PI, true); g.fill(); g.fillStyle = '#1a2a50'; g.beginPath(); g.arc(9, 9, 5.5, 0, Math.PI); g.fill(); R(8, 4, 2, 5, '#f8f0c0'); return c.toDataURL(); }
-  if (id === I.BOAT) { R(1, 8, 16, 3, '#9c7a48'); R(2, 11, 14, 3, '#7a5a30'); R(4, 14, 10, 1, '#5e4524'); R(1, 7, 2, 1, '#6b4a24'); R(15, 7, 2, 1, '#6b4a24'); R(6, 4, 1, 6, '#6b4a24'); R(11, 4, 1, 6, '#6b4a24'); return c.toDataURL(); }
-  if (id === I.SHEARS) { R(4, 3, 2, 8, '#d8d8d8'); R(12, 3, 2, 8, '#d8d8d8'); R(6, 9, 6, 2, '#aaa'); g.fillStyle = '#c03030'; g.beginPath(); g.arc(5, 14, 2.5, 0, 7); g.arc(13, 14, 2.5, 0, 7); g.fill(); return c.toDataURL(); }
-  if (id === I.FISHING_ROD) { for (let k = 0; k < 13; k++) R(3 + k, 15 - k, 2, 1, '#8a6232'); R(15, 2, 1, 12, '#e8e8e8'); R(14, 13, 3, 2, '#c03030'); return c.toDataURL(); }
-  if (id === I.RAW_COD || id === I.COOKED_COD) { const a = id === I.RAW_COD ? '#b0a080' : '#a06a3a', b2 = id === I.RAW_COD ? '#d8c8a8' : '#c8904a'; g.fillStyle = a; g.beginPath(); g.ellipse(8, 9, 6, 3.5, 0, 0, 7); g.fill(); R(13, 6, 4, 6, a); R(4, 8, 6, 2, b2); R(4, 7, 1, 1, '#111'); return c.toDataURL(); }
-  if (id === I.SLIME_BALL) { g.fillStyle = '#5aa848'; g.beginPath(); g.arc(9, 9, 6, 0, 7); g.fill(); g.fillStyle = '#8ad870'; g.beginPath(); g.arc(7, 7, 2.5, 0, 7); g.fill(); return c.toDataURL(); }
-  if (id === I.MILK_BUCKET) { R(4, 5, 10, 10, '#c8c8c8'); R(5, 6, 8, 3, '#fafafa'); R(3, 4, 12, 2, '#9a9a9a'); return c.toDataURL(); }
-  if (id === I.SHIELD) { R(4, 2, 10, 10, '#9c7a48'); R(5, 12, 8, 2, '#9c7a48'); R(7, 14, 4, 2, '#9c7a48'); R(8, 2, 2, 14, '#aaa'); R(4, 6, 10, 2, '#aaa'); return c.toDataURL(); }
-  if (id === I.TRIDENT) { for (let k = 0; k < 12; k++) R(3 + k, 15 - k, 1, 1, '#3a8a8a'); R(12, 1, 1, 5, '#6ad0c8'); R(15, 3, 1, 5, '#6ad0c8'); R(14, 1, 2, 2, '#6ad0c8'); R(11, 5, 4, 2, '#3a8a8a'); return c.toDataURL(); }
-  if (isArmor(id)) {
-    const a = armorInfo(id); const M2 = [
-      ['................', '...hhhhhhhhhh...', '..hhhhhhhhhhhh..', '..hh........hh..', '..hh........hh..', '..hh........hh..'],
-      ['..hhh....hhh....', '.hhhhhhhhhhhh...', '.hhhhhhhhhhhh...', '..hhhhhhhhhh....', '...hhhhhhhh.....', '...hhhhhhhh.....', '...hhhhhhhh.....', '...hhhhhhhh.....', '...hhhhhhhh.....', '...hhhhhhhh.....'],
-      ['...hhhhhhhhh....', '...hhhhhhhhh....', '...hhhh.hhhh....', '...hhh...hhh....', '...hhh...hhh....', '...hhh...hhh....', '...hhh...hhh....', '...hhh...hhh....', '...hhh...hhh....'],
-      ['................', '................', '................', '..hhh.....hhh...', '..hhh.....hhh...', '..hhh.....hhh...', '.hhhh....hhhh...', '.hhhh....hhhh...'],
-    ][a.piece];
-    drawMap(g, M2.map((r, y) => (y % 4 === 2 ? r.replace(/h/g, 'd') : r.replace(/^(\.*)h/, '$1d'))), { h: a.color, d: a.dark }); return c.toDataURL();
-  }
+  const art = ART[id];
+  if (art) { drawMap(g, art.rows, typeof art.cols === 'function' ? art.cols(id) : art.cols); return c.toDataURL(); }
   if (isTool(id)) {
     const t = toolInfo(id);
-    drawMap(g, TOOL_SHAPES[t.type], { h: t.color, s: '#6b4a24', g: t.dark });
-  } else {
-    const M = {
-      [I.STICK]: ['#8a6232', '#6b4a24', 'stick'], [I.COAL]: ['#2a2a2a', '#444', 'round'], [I.IRON_INGOT]: ['#e0e0e0', '#b0b0b0', 'ingot'],
-      [I.GOLD_INGOT]: ['#f8d848', '#d0a020', 'ingot'], [I.DIAMOND]: ['#6ff2e8', '#2bb8b0', 'gem'], [I.REDSTONE]: ['#e02020', '#900', 'pile'],
-      [I.APPLE]: ['#d8202a', '#ff6060', 'round'], [I.RAW_PORK]: ['#f29a9a', '#e07070', 'meat'], [I.COOKED_PORK]: ['#b9763e', '#8a5426', 'meat'],
-      [I.RAW_BEEF]: ['#c83232', '#f0d0d0', 'meat'], [I.STEAK]: ['#7a4a26', '#5a3418', 'meat'], [I.GUNPOWDER]: ['#666', '#888', 'pile'],
-      [I.ROTTEN_FLESH]: ['#8a6a3a', '#5a7a2a', 'meat'], [I.FLINT]: ['#3a3a3a', '#666', 'shard'], [I.FLINT_STEEL]: ['#c0c0c0', '#3a3a3a', 'shard'],
-      [I.RAW_MUTTON]: ['#d04848', '#f0c0c0', 'meat'], [I.COOKED_MUTTON]: ['#9a5a30', '#6a3a18', 'meat'], [I.BREAD]: ['#c8923a', '#a0702a', 'loaf'],
-      [I.BONE]: ['#eeeede', '#cfcfbf', 'bone'], [I.BUCKET]: ['#c8c8c8', '#9a9a9a', 'bucket'], [I.WATER_BUCKET]: ['#c8c8c8', '#9a9a9a', 'bucket'], [I.LAVA_BUCKET]: ['#c8c8c8', '#9a9a9a', 'bucket'], [I.ARROW]: ['#8a6232', '#ddd', 'stick'],
-      [I.LAPIS]: ['#2a50c8', '#4a78ff', 'gem'], [I.BOOK]: ['#8a3a2a', '#e8e0c8', 'book'], [I.PAPER]: ['#f0ece0', '#d8d2c0', 'paper'],
-      [I.LEATHER]: ['#a0602a', '#7a4418', 'paper'], [I.QUARTZ]: ['#f0ece6', '#c8c0b8', 'shard'], [I.GOLD_NUGGET]: ['#f8d848', '#c09020', 'nugget'],
-      [I.BLAZE_ROD]: ['#f8c830', '#ff8a10', 'stick'], [I.BLAZE_POWDER]: ['#ffb020', '#ff7010', 'pile'], [I.GHAST_TEAR]: ['#e8f4f8', '#a8d0e0', 'gem'],
-      [I.MAGMA_CREAM]: ['#e8701a', '#f8d040', 'round'], [I.NETHER_BRICK]: ['#5a2a30', '#3a1418', 'ingot'],
-      [I.RAW_CHICKEN]: ['#f0c8b0', '#e0a890', 'meat'], [I.COOKED_CHICKEN]: ['#c8843a', '#9a5a20', 'meat'], [I.CHORUS_FRUIT]: ['#8a5a9a', '#c8a0d8', 'round'],
-      [I.STRING]: ['#f0f0f0', '#cfcfcf', 'stick'],
-      [I.SEEDS]: ['#5aa02a', '#3a7a1a', 'pile'], [I.WHEAT]: ['#d8b848', '#a88a28', 'stick'], [I.EMERALD]: ['#3ade6a', '#18a040', 'gem'],
-    }[id] || ['#f0f', '#000', 'round'];
-    blob(g, M[0], M[1], id * 13, M[2]);
-    if (id === I.WATER_BUCKET || id === I.LAVA_BUCKET || id === I.BUCKET) { g.fillStyle = id === I.WATER_BUCKET ? '#3a6ae8' : id === I.LAVA_BUCKET ? '#ff7a10' : '#555'; g.fillRect(3, 5, 12, 2); }
-    if (id === I.BOOK) { g.fillStyle = '#f0e8d0'; g.fillRect(11, 3, 2, 10); g.fillStyle = '#d8b040'; g.fillRect(6, 5, 3, 1); }
-    if (id === I.APPLE) { g.fillStyle = '#5a3a1a'; g.fillRect(8, 1, 1, 3); g.fillStyle = '#3a9a2a'; g.fillRect(9, 2, 2, 1); }
+    drawMap(g, TOOL_SHAPES[t.type], { a: t.color, h: mix(t.color, '#ffffff', 0.35), s: '#8a6232', g: '#4a4a4a' });
+    return c.toDataURL();
   }
+  if (isArmor(id)) {
+    const a = armorInfo(id);
+    drawMap(g, ARMOR_SHAPES[a.piece], { m: a.color, h: mix(a.color, '#ffffff', 0.35), d: mix(a.dark, '#000000', 0.25) });
+    return c.toDataURL();
+  }
+  const M = {
+    [I.STICK]: ['#8a6232', '#6b4a24', 'stick'], [I.COAL]: ['#2a2a2a', '#444444', 'round'], [I.IRON_INGOT]: ['#e0e0e0', '#b0b0b0', 'ingot'],
+    [I.GOLD_INGOT]: ['#f8d848', '#d0a020', 'ingot'], [I.DIAMOND]: ['#6ff2e8', '#2bb8b0', 'gem'], [I.REDSTONE]: ['#e02020', '#900000', 'pile'],
+    [I.APPLE]: ['#d8202a', '#ff6060', 'round'], [I.RAW_PORK]: ['#f29a9a', '#e07070', 'meat'], [I.COOKED_PORK]: ['#b9763e', '#8a5426', 'meat'],
+    [I.RAW_BEEF]: ['#c83232', '#f0d0d0', 'meat'], [I.STEAK]: ['#7a4a26', '#5a3418', 'meat'], [I.GUNPOWDER]: ['#666666', '#888888', 'pile'],
+    [I.ROTTEN_FLESH]: ['#8a6a3a', '#5a7a2a', 'meat'], [I.FLINT]: ['#3a3a3a', '#666666', 'shard'], [I.FLINT_STEEL]: ['#c0c0c0', '#3a3a3a', 'shard'],
+    [I.RAW_MUTTON]: ['#d04848', '#f0c0c0', 'meat'], [I.COOKED_MUTTON]: ['#9a5a30', '#6a3a18', 'meat'], [I.BREAD]: ['#c8923a', '#a0702a', 'loaf'],
+    [I.BONE]: ['#eeeede', '#cfcfbf', 'bone'], [I.ARROW]: ['#8a6232', '#dddddd', 'stick'],
+    [I.LAPIS]: ['#2a50c8', '#4a78ff', 'gem'], [I.BOOK]: ['#8a3a2a', '#e8e0c8', 'book'], [I.PAPER]: ['#f0ece0', '#d8d2c0', 'paper'],
+    [I.LEATHER]: ['#a0602a', '#7a4418', 'paper'], [I.QUARTZ]: ['#f0ece6', '#c8c0b8', 'shard'], [I.GOLD_NUGGET]: ['#f8d848', '#c09020', 'nugget'],
+    [I.BLAZE_ROD]: ['#f8c830', '#ff8a10', 'stick'], [I.BLAZE_POWDER]: ['#ffb020', '#ff7010', 'pile'], [I.GHAST_TEAR]: ['#e8f4f8', '#a8d0e0', 'gem'],
+    [I.MAGMA_CREAM]: ['#e8701a', '#f8d040', 'round'], [I.NETHER_BRICK]: ['#5a2a30', '#3a1418', 'ingot'],
+    [I.RAW_CHICKEN]: ['#f0c8b0', '#e0a890', 'meat'], [I.COOKED_CHICKEN]: ['#c8843a', '#9a5a20', 'meat'], [I.CHORUS_FRUIT]: ['#8a5a9a', '#c8a0d8', 'round'],
+    [I.STRING]: ['#f0f0f0', '#cfcfcf', 'stick'],
+    [I.SEEDS]: ['#5aa02a', '#3a7a1a', 'pile'], [I.WHEAT]: ['#d8b848', '#a88a28', 'stick'], [I.EMERALD]: ['#3ade6a', '#18a040', 'gem'],
+  }[id] || ['#f0f', '#000', 'round'];
+  blob(g, M[0], M[1], id * 13, M[2]);
+  if (id === I.BOOK) { g.fillStyle = '#f0e8d0'; g.fillRect(11, 3, 2, 10); g.fillStyle = '#d8b040'; g.fillRect(6, 5, 3, 1); }
+  if (id === I.APPLE) { g.fillStyle = '#5a3a1a'; g.fillRect(8, 1, 1, 3); g.fillStyle = '#3a9a2a'; g.fillRect(9, 2, 2, 1); }
   return c.toDataURL();
 }
 export function iconFor(id) {

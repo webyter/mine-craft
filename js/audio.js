@@ -31,12 +31,12 @@ function tone(freq, dur, vol, type = 'sine', slide = 0, out = sfxGain, when = 0)
   o.connect(g); g.connect(out); o.start(t); o.stop(t + dur + 0.05);
 }
 const MAT = (id) => {
-  if ([1, 2, 18, 42, 32, 33, 34, 55].includes(id)) return 'grass';
+  if ([1, 2, 18, 42, 32, 33, 34, 55, 217].includes(id)) return 'grass';
   if ([6, 7, 47].includes(id)) return 'sand';
-  if ([8, 10, 21, 23, 25, 27, 41, 46, 56, 37, 64, 72].includes(id)) return 'wood';
+  if ([8, 10, 21, 23, 25, 27, 41, 46, 56, 37, 64, 72, 215].includes(id)) return 'wood';
   if ([58, 59, 60, 61, 62, 63].includes(id)) return 'grass';
   if ([9, 22, 24].includes(id)) return 'leaf';
-  if ([12, 19, 38].includes(id)) return 'glass';
+  if ([12, 19, 38, 216].includes(id)) return 'glass';
   if ([35, 49, 50, 51, 52, 53].includes(id)) return 'cloth';
   return 'stone';
 };
@@ -59,7 +59,6 @@ export const sfx = {
   endPortal() { for (let k = 0; k < 6; k++) tone(220 * (1 + k * 0.25), 1.6, 0.12, 'sine', 1.01, sfxGain, k * 0.12); noise(1.5, 600, 0.5, 0.2, 'lowpass', 0.3); },
   crystalBoom() { noise(0.9, 400, 0.6, 0.9, 'lowpass'); tone(60, 0.8, 0.5, 'sine', 0.5); },
   hit() { noise(0.1, 500, 1.5, 0.6); tone(140, 0.1, 0.25, 'square', 0.5); },
-  pop() { tone(500 + Math.random() * 300, 0.08, 0.2, 'sine', 2.2); },
   eat() { for (let i = 0; i < 3; i++) setTimeout(() => noise(0.08, 1200, 1.5, 0.4), i * 140); },
   burp() { tone(140, 0.3, 0.3, 'sawtooth', 0.7); },
   explode() { noise(1.4, 200, 0.5, 1.2, 'lowpass', 0.005); noise(0.6, 800, 0.8, 0.6); tone(60, 0.9, 0.6, 'sine', 0.4); },

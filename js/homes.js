@@ -1,13 +1,13 @@
-// Mine Craft — player home plots: district location + starter house templates
+// VoxCraft — player home plots: district location + starter house templates
 import { B } from './blocks.js';
 import { SEA, H } from './world.js';
 
-export const PLOT = 32, PLOT_COLS = 12;
+export const PLOT = 32, PLOT_COLS = 12, PLOT_ROWS = 6;
 export const HOME_STYLES = [['cottage', 'Cottage'], ['modern', 'Modern'], ['cabin', 'Log cabin'], ['villa', 'Villa']];
 
 // Deterministic search for an open, dry area away from settlements (same result on every client)
 export function findHomeOrigin(world) {
-  const st = world.settle; const W = PLOT * PLOT_COLS, D = PLOT * 6;
+  const st = world.settle; const W = PLOT * PLOT_COLS, D = PLOT * PLOT_ROWS;
   let best = null, bestScore = -1e9;
   for (let r = 260; r <= 1400; r += 140) {
     for (let a = 0; a < 16; a++) {
@@ -28,7 +28,7 @@ export function plotRect(origin, idx) {
 }
 export function plotAt(origin, x, z) {
   if (!origin) return -1; const gx = Math.floor((x - origin.x) / PLOT), gz = Math.floor((z - origin.z) / PLOT);
-  if (gx < 0 || gz < 0 || gx >= PLOT_COLS) return -1; return gz * PLOT_COLS + gx;
+  if (gx < 0 || gz < 0 || gx >= PLOT_COLS || gz >= PLOT_ROWS) return -1; return gz * PLOT_COLS + gx;
 }
 // base height of the district (shared, so plots line up)
 export function plotBase(world, origin, idx) {
@@ -79,7 +79,7 @@ export function homeEdits(world, origin, idx, style, ownerName) {
     }
   }
   // door (2-high opening) + porch light
-  set(r.cx, base + 1, hz0, 0); set(r.cx, base + 2, hz0, 0); set(r.cx + 1, base + 3, hz0 - 1, B.TORCH);
+  set(r.cx, base + 1, hz0, B.OAK_DOOR, 0); set(r.cx, base + 2, hz0, B.OAK_DOOR_TOP, 0); set(r.cx + 1, base + 3, hz0 - 1, B.TORCH);
   set(r.cx - 1, base + 3, hz0 - 1, B.TORCH);
   // roof
   if (style === 'modern') {

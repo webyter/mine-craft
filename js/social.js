@@ -1,4 +1,4 @@
-// Mine Craft — online lobby, character creator, social hub, emote wheel
+// VoxCraft — online lobby, character creator, social hub, emote wheel
 import * as THREE from 'three';
 import { Avatar, DEFAULT_SKIN, randomSkin, SKIN_TONES, HAIR_COLORS, EYE_COLORS, CLOTH_COLORS, OPTIONS, EMOTES } from './avatar.js';
 import { HOME_STYLES } from './homes.js';

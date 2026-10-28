@@ -1,8 +1,8 @@
-# Mine Craft
+# VoxCraft
 
-A mobile-friendly voxel sandbox prototype with procedural settlements, survival and creative modes, character customization, player homes, chat, friends, emotes, and an experimental shared overworld.
+A mobile-friendly voxel sandbox with procedural settlements, survival and creative modes, character customization, player homes, chat, friends, emotes, and an experimental shared overworld.
 
-This is an independent fan-made prototype, not an official Minecraft product and not affiliated with Mojang or Microsoft. It does not implement all Bedrock features.
+This is an independent fan-made voxel game. It is not affiliated with, endorsed by or sponsored by Mojang or Microsoft; Minecraft is a trademark of Mojang Synergies AB. It does not implement all Minecraft features.
 
 ## Run locally
 
@@ -27,6 +27,7 @@ The server listens on port 8000 by default and exposes the WebSocket endpoint `/
 
 ## Multiplayer data and deployment
 
+- Single-player worlds are saved in the browser (name, seed, game mode, inventory, position and every block you change), with autosave every 25 seconds and on Save, quitting, or leaving the page. The title screen offers **Continue** for the saved world.
 - The Node server source is included in `server/server.js`. Runtime world edits, profiles, homes, messages, and reports are saved under `server/data/`, which is intentionally excluded from Git.
 - The shared overworld is experimental. Nether and End worlds and mob simulation are client-side.
 - Identity currently relies on a visitor identifier rather than secure account authentication. Outside the preview environment, the client generates a new visitor identifier on reload, so ownership is not guaranteed to persist across visits.

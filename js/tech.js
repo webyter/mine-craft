@@ -4,8 +4,8 @@ import { B, I, BLOCKS, itemName, maxStack, maxDur } from './blocks.js';
 import { iconFor } from './textures.js';
 
 const ADS = [
-  ['MINE CRAFT', '2025 EDITION'], ['PHONE 17 PRO', 'NOW WITH 6G'], ['DRIVE ELECTRIC', 'ZERO EMISSIONS'], ['CLOUD AI', 'THINK BIGGER'],
-  ['SOLAR CITY', 'POWER UP'], ['BREAKING NEWS', 'LIVE 24/7'], ['MINE BURGER', '2 FOR 1 EMERALD'], ['VR HEADSET', 'STEP INSIDE'],
+  ['VOX CRAFT', '2025 EDITION'], ['PHONE 17 PRO', 'NOW WITH 6G'], ['DRIVE ELECTRIC', 'ZERO EMISSIONS'], ['CLOUD AI', 'THINK BIGGER'],
+  ['SOLAR CITY', 'POWER UP'], ['BREAKING NEWS', 'LIVE 24/7'], ['VOX BURGER', '2 FOR 1 EMERALD'], ['VR HEADSET', 'STEP INSIDE'],
   ['STREAM NOW', 'NEW SEASON'], ['SMART HOME', 'VOICE CONTROL'],
 ];
 const HEADLINES = [
@@ -162,11 +162,11 @@ export class Tech {
   close() { if (this.o.ui.screen === 'device') this.o.ui.screen = null; this.el.classList.add('hidden'); this.g.onScreenClose(); }
   wire() { for (const b of this.body.querySelectorAll('[data-act]')) b.addEventListener('click', (e) => { e.stopPropagation(); this.act(b.dataset.act, b.dataset.arg); }); }
   act(a, arg) {
-    const f = { app: () => this.app(arg), home: () => this.phone(), buy: () => this.buy(+arg), floor: () => this.goFloor(+arg), taxi: () => this.taxi(), photo: () => this.photo(), nav: () => this.nav(arg), weather: () => { this.g.raining = !this.g.raining; this.app('weather'); }, withdraw: () => this.withdraw(), vend: () => this.vend(), shop: () => this.computer('shop'), news: () => this.computer('news'), close: () => this.close() }[a];
+    const f = { app: () => this.app(arg), home: () => this.phone(), buy: () => this.buy(+arg), floor: () => this.goFloor(+arg), taxi: () => this.taxi(), photo: () => this.photo(), nav: () => this.nav(arg), weather: () => { this.g.raining = !this.g.raining; this.g.snowing = false; this.g.thunder = false; this.app('weather'); }, withdraw: () => this.withdraw(), vend: () => this.vend(), shop: () => this.computer('shop'), news: () => this.computer('news'), close: () => this.close() }[a];
     if (f) { this.o.sfx.click(); f(); }
   }
   phone() {
-    const apps = [['maps', 'Maps', '#2a9a5a'], ['gps', 'GPS', '#2a6ad8'], ['weather', 'Weather', '#e8a020'], ['taxi', 'Taxi', '#f0c020'], ['camera', 'Camera', '#555'], ['photos', 'Photos', '#d84a7a'], ['news', 'News', '#c01818'], ['shop', 'MineShop', '#6a2ad8']];
+    const apps = [['maps', 'Maps', '#2a9a5a'], ['gps', 'GPS', '#2a6ad8'], ['weather', 'Weather', '#e8a020'], ['taxi', 'Taxi', '#f0c020'], ['camera', 'Camera', '#555'], ['photos', 'Photos', '#d84a7a'], ['news', 'News', '#c01818'], ['shop', 'VoxShop', '#6a2ad8']];
     this.open('Smartphone', `<div class="dev-status">${this.clock()} · 5G · ${this.g.raining ? 'Rain' : 'Clear'}</div><div class="apps">${apps.map(([k, n, c]) => `<button class="app" data-act="app" data-arg="${k}"><span class="app-ic" style="background:${c}">${n[0]}</span>${n}</button>`).join('')}</div>`);
   }
   back() { return '<button class="dev-back" data-act="home">‹ Home</button>'; }
@@ -174,6 +174,7 @@ export class Tech {
     if (k === 'maps') { this.open('Maps', this.back() + '<canvas id="dev-map" width="256" height="256"></canvas><div class="dev-note">North is up · 256 m across</div>'); this.drawMap(document.getElementById('dev-map')); return; }
     if (k === 'gps') {
       const S = this.g.world.settle; const P = this.o.player; const rows = [];
+      if (!S) { this.open('GPS', this.back() + '<p>No signal in this dimension.</p>'); return; }
       for (const type of ['city', 'village', 'energy']) { const p = S.nearest(type, P.x, P.z, 10); if (p) rows.push(p); }
       this.open('GPS', this.back() + (rows.length ? rows.map((p) => { const d = Math.hypot(p.x - P.x, p.z - P.z); return `<div class="row"><div><b>${p.name || 'Village'}</b><br><small>${p.type === 'energy' ? 'Wind farm' : p.type[0].toUpperCase() + p.type.slice(1)} · ${Math.round(d)} m ${this.compass(p.x - P.x, p.z - P.z)}</small></div><button data-act="nav" data-arg="${p.x},${p.z},${encodeURIComponent(p.name || 'Village')}">Go</button></div>`; }).join('') : '<p>No places found nearby.</p>'));
       return;
@@ -192,7 +193,7 @@ export class Tech {
     if (k === 'shop') { this.computer('shop', true); return; }
   }
   newsHtml() {
-    const S = this.g.world.settle; const P = this.o.player; const c = S.nearest('city', P.x, P.z, 8);
+    const S = this.g.world.settle; const P = this.o.player; const c = S ? S.nearest('city', P.x, P.z, 8) : null;
     const day = Math.floor(this.g.ticks / 24000) + 1; const n = (day * 7) % HEADLINES.length;
     const list = [c ? `${c.name} skyline grows with ${c.kinds ? c.kinds.filter((k) => k === 'skyscraper').length : 3} skyscrapers` : 'New city planned on the horizon', ...HEADLINES.slice(n), ...HEADLINES.slice(0, n)].slice(0, 7);
     return `<div class="dev-note">Day ${day} · ${this.clock()}</div>` + list.map((h, i) => `<div class="news"><b>${h}</b><small>${['World', 'Tech', 'City', 'Sport', 'Business', 'Science', 'Local'][i % 7]} · ${i + 1}h ago</small></div>`).join('');
@@ -211,7 +212,7 @@ export class Tech {
       ctx.fillStyle = `rgb(${c[0] * 255 * sh | 0},${c[1] * 255 * sh | 0},${c[2] * 255 * sh | 0})`; ctx.fillRect(i * 2, j * 2, 2, 2);
     }
     ctx.font = '700 11px system-ui, sans-serif'; ctx.textAlign = 'center';
-    for (const p of w.settle.plansNear(P.x - R, P.z - R, P.x + R, P.z + R)) {
+    for (const p of (w.settle ? w.settle.plansNear(P.x - R, P.z - R, P.x + R, P.z + R) : [])) {
       const mx = (p.x - P.x + R), mz = (p.z - P.z + R); ctx.fillStyle = 'rgba(0,0,0,0.6)'; const label = p.name || 'Village'; const tw = ctx.measureText(label).width + 8;
       ctx.fillRect(mx - tw / 2, mz - 8, tw, 15); ctx.fillStyle = p.type === 'city' ? '#7ad0ff' : '#ffe080'; ctx.fillText(label, mx, mz + 3);
     }
@@ -236,10 +237,10 @@ export class Tech {
     this.o.sfx.shutter && this.o.sfx.shutter(); this.app('photos');
   }
   computer(tab = 'shop', fromPhone = false) {
-    const head = fromPhone ? this.back() : `<div class="tabs"><button data-act="shop" class="${tab === 'shop' ? 'on' : ''}">MineShop</button><button data-act="news" class="${tab === 'news' ? 'on' : ''}">News</button></div>`;
-    if (tab === 'news') { this.open('MineNet Browser', head + this.newsHtml()); return; }
+    const head = fromPhone ? this.back() : `<div class="tabs"><button data-act="shop" class="${tab === 'shop' ? 'on' : ''}">VoxShop</button><button data-act="news" class="${tab === 'news' ? 'on' : ''}">News</button></div>`;
+    if (tab === 'news') { this.open('VoxNet Browser', head + this.newsHtml()); return; }
     let em = 0; for (const s of this.g.inv.slots) if (s && s.id === I.EMERALD) em += s.count;
-    this.open(fromPhone ? 'MineShop' : 'MineNet Browser', head + `<div class="dev-note">${this.g.mode === 'creative' ? 'Creative: everything is free' : 'Wallet: ' + em + ' emeralds'} · Next-day delivery is instant</div><div class="shop">` +
+    this.open(fromPhone ? 'VoxShop' : 'VoxNet Browser', head + `<div class="dev-note">${this.g.mode === 'creative' ? 'Creative: everything is free' : 'Wallet: ' + em + ' emeralds'} · Next-day delivery is instant</div><div class="shop">` +
       SHOP.map(([id, n, price], i) => `<button class="item" data-act="buy" data-arg="${i}"><img src="${iconFor(id)}" alt=""><span>${itemName(id)}${n > 1 ? ' ×' + n : ''}</span><b>${price} em</b></button>`).join('') + '</div>');
   }
   buy(i) { const [id, n, price] = SHOP[i]; if (!this.pay(price)) return; this.give(id, Math.min(n, maxStack(id))); this.o.toast('Delivered: ' + itemName(id) + (n > 1 ? ' ×' + n : '')); this.o.sfx.pop && this.o.sfx.pop(); void maxDur; }
@@ -257,7 +258,7 @@ export class Tech {
     P.x = e.x + e.nx + 0.5; P.z = e.z + e.nz + 0.5; P.y = y + 0.01; P.vx = P.vy = P.vz = 0; P.fallStart = null; P.yaw = Math.atan2(-e.nx, -e.nz);
     this.o.sfx.ding && this.o.sfx.ding(); { const i = e.floors.indexOf(y); this.o.toast(i === 0 ? 'Lobby' : i === e.floors.length - 1 && e.floors.length > 2 ? 'Roof' : 'Floor ' + i); }
   }
-  atm(b) { this.atmKey = b.x + ',' + b.y + ',' + b.z; const day = Math.floor(this.g.ticks / 24000); const used = this.atmDay.get(this.atmKey) === day; this.open('ATM', `<div class="atm"><div class="dev-note">Mine Bank · 24h service</div><p>${used ? 'Daily limit reached. Come back tomorrow.' : 'Your daily allowance is ready.'}</p>${used ? '' : '<button class="wide" data-act="withdraw">Withdraw 2 emeralds</button>'}</div>`); }
+  atm(b) { this.atmKey = b.x + ',' + b.y + ',' + b.z; const day = Math.floor(this.g.ticks / 24000); const used = this.atmDay.get(this.atmKey) === day; this.open('ATM', `<div class="atm"><div class="dev-note">Vox Bank · 24h service</div><p>${used ? 'Daily limit reached. Come back tomorrow.' : 'Your daily allowance is ready.'}</p>${used ? '' : '<button class="wide" data-act="withdraw">Withdraw 2 emeralds</button>'}</div>`); }
   withdraw() { const day = Math.floor(this.g.ticks / 24000); this.atmDay.set(this.atmKey, day); this.give(I.EMERALD, 2); this.o.toast('Withdrew 2 emeralds'); this.close(); }
   vending() { this.open('Vending Machine', `<p>Snacks and drinks</p><p class="dev-note">${this.g.mode === 'creative' ? 'Free in Creative' : '1 emerald'}</p><button class="wide" data-act="vend">Buy a snack</button>`); }
   vend() { if (!this.pay(1)) return; const opts = [[I.BREAD, 2], [I.APPLE, 3], [I.COOKED_PORK, 2], [I.STEAK, 1]]; const [id, n] = opts[Math.floor(Math.random() * opts.length)]; this.give(id, n); this.o.toast('Clunk. ' + itemName(id) + ' ×' + n); this.o.sfx.pop && this.o.sfx.pop(); }

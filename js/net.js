@@ -1,4 +1,4 @@
-// Mine Craft — online multiplayer client
+// VoxCraft — online multiplayer client
 import * as THREE from 'three';
 import { Avatar } from './avatar.js';
 import { findHomeOrigin, plotAt, plotRect, homeEdits, plotBase } from './homes.js';
@@ -28,9 +28,12 @@ export class Net {
     return `${base.replace(/\/$/, '')}/ws?vid=${this.vid}`;
   }
   connect() {
-    return new Promise((res, rej) => {
-      if (this.ws && this.ws.readyState <= 1) { res(this.hi); return; }
-      this.state = 'connecting'; let done = false;
+    // one handshake at a time: a second call while the first socket is still opening
+    // must wait for it instead of opening a duplicate connection
+    if (this._pending) return this._pending;
+    if (this.ws && this.ws.readyState <= 1 && this.hi) return Promise.resolve(this.hi);
+    const p = new Promise((res, rej) => {
+      this.state = 'connecting'; this.leaving = false; let done = false;
       let ws; try { ws = new WebSocket(this.url()); } catch (e) { this.state = 'off'; rej(e); return; }
       this.ws = ws;
       const to = setTimeout(() => { if (!done) { done = true; try { ws.close(); } catch (_) { } this.state = 'off'; rej(new Error('timeout')); } }, 9000);
@@ -41,10 +44,16 @@ export class Net {
       };
       ws.onerror = () => { if (!done) { done = true; clearTimeout(to); this.state = 'off'; rej(new Error('offline')); } };
       ws.onclose = () => {
-        const was = this.state; this.state = 'off'; this.ws = null;
-        if (was === 'online') { this.api.toast('Disconnected from the online world'); this.clearPlayers(); this.emit('status'); this.scheduleReconnect(); }
+        const was = this.state; this.state = 'off';
+        if (this.ws === ws) this.ws = null; if (this.hi) this.hi = null;
+        const left = this.leaving; this.leaving = false;
+        if (was === 'online' && !left) { this.api.toast('Disconnected from the online world'); this.clearPlayers(); this.emit('status'); this.scheduleReconnect(); }
       };
     });
+    this._pending = p;
+    const clear = () => { if (this._pending === p) this._pending = null; };
+    p.then(clear, clear);
+    return p;
   }
   scheduleReconnect() {
     if (this.reconnecting || !this.profile) return; this.reconnecting = true; let tries = 0;
@@ -57,7 +66,7 @@ export class Net {
     setTimeout(go, 1500);
   }
   join(name, skin) { this.profile = { name, skin }; this.send({ t: 'hello', name, skin, pos: null }); }
-  leave() { this.profile = null; if (this.ws) { try { this.ws.close(); } catch (_) { } } this.state = 'off'; this.clearPlayers(); for (const s of this.signs.values()) this.api.scene.remove(s); this.signs.clear(); }
+  leave() { this.profile = null; this.reconnecting = false; this.leaving = !!this.ws; if (this.ws) { try { this.ws.close(); } catch (_) { } } this.state = 'off'; this.clearPlayers(); for (const s of this.signs.values()) this.api.scene.remove(s); this.signs.clear(); }
   send(m) { if (this.ws && this.ws.readyState === 1) this.ws.send(JSON.stringify(m)); }
 
   // ---------- world integration ----------

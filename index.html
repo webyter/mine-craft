@@ -7,9 +7,8 @@
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="mobile-web-app-capable" content="yes" />
 <meta name="theme-color" content="#1e1e1e" />
-<title>Mine Craft</title>
+<title>VoxCraft</title>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <style>
 @font-face { font-family: 'MCFont'; font-style: normal; font-weight: 400; font-display: swap; size-adjust: 125%;
@@ -36,14 +35,14 @@
 <!-- Title -->
 <div id="title" class="screen hidden">
   <div class="title-wrap">
-    <h1 class="logo" aria-label="Mine Craft"><span>MINE</span><span>CRAFT</span></h1>
+    <h1 class="logo" aria-label="VoxCraft"><span>VOX</span><span>CRAFT</span></h1>
     <div class="splash" id="splash">Made for phones!</div>
     <div class="menu">
       <button class="btn btn-green" id="btn-play">Play</button>
       <button class="btn" id="btn-settings-title">Settings</button>
       <button class="btn" id="btn-howto">How to Play</button>
     </div>
-    <div class="edition">Bedrock-style edition · v2.0 · 2025 cities</div>
+    <div class="edition">Voxel edition · v2.0 · 2025 cities</div>
   </div>
 </div>
 
@@ -78,6 +77,7 @@
       <div class="tip"><b>Sneak</b><span>Tap the sneak button to crouch so you won't fall off edges.</span></div>
       <div class="tip"><b>Inventory</b><span>Tap ••• next to the hotbar. Tap a slot to pick up a stack, tap another to drop it. Hold to split.</span></div>
       <div class="tip"><b>Crafting</b><span>Put materials in the 2×2 grid (or 3×3 at a Crafting Table). Logs → planks → sticks → tools.</span></div>
+      <div class="tip"><b>City buildings</b><span>City buildings are reinforced: in Survival they need an iron pickaxe and take a long time to break, and explosions do not scratch them. Plazas, parks and parking lots stay free to build in.</span></div>
       <div class="tip"><b>Commands</b><span>Tap the chat button and type /help — try /time set night, /gamemode creative, /give diamond 64.</span></div>
       <div class="tip"><b>Keyboard</b><span>WASD move, Space jump, Shift sneak, Ctrl sprint, E inventory, T chat, 1–9 hotbar, F fly (creative). Drag to look, hold to mine, right-click to place.</span></div>
     </div>
@@ -162,6 +162,7 @@
     <h2>Game Paused</h2>
     <div class="menu">
       <button class="btn btn-green" id="btn-resume">Resume Game</button>
+      <button class="btn" id="btn-save">Save Game</button>
       <button class="btn" id="btn-settings-pause">Settings</button>
       <div class="row2">
         <button class="btn" id="btn-mode">Mode: Survival</button>

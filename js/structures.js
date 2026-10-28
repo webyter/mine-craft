@@ -54,7 +54,12 @@ export class Settlements {
     if (!plans.length) return rects;
     const w = this.w;
     const S = {
-      x0, z0, x1, z1, set: setM, get: getL,
+      x0, z0, x1, z1,
+      set: (x, y, z, id, meta) => {
+        setM(x, y, z, id, meta);
+        // vending machines are two blocks tall: add the top half with every machine
+        if (id === B.VENDING && (getL(x, y + 1, z) === 0 || getL(x, y + 1, z) === B.TALL_GRASS)) setM(x, y + 1, z, B.VENDING_TOP, meta);
+      }, get: getL,
       inClip: (x, z) => x >= x0 && x <= x1 && z >= z0 && z <= z1,
       loot(x, y, z, table) { if (S.inClip(x, z)) w.loot.set(x + ',' + y + ',' + z, table); },
       crop(x, y, z) { if (S.inClip(x, z)) w.crops.set(x + ',' + y + ',' + z, [x, y, z]); },
@@ -408,7 +413,7 @@ export class Settlements {
     const base = this.flat ? 4 : Math.max(SEA + 2, Math.min(SEA + 10, hs[Math.floor(hs.length / 2)]));
     const pieces = [], mobs = [];
     const plan = { type: 'city', x: cx, z: cz, y: base, pieces, mobs, r: [x0 - 5, z0 - 5, x0 + SZ + 4, z0 + SZ + 4], name: town ? cityName(rnd).replace(' City', '') + ' Town' : cityName(rnd), town,
-      grid: { x0, z0, P, RW, SZ, NB, base }, signals: [], screens: [], parked: [], turbines: [], kinds: [] };
+      grid: { x0, z0, P, RW, SZ, NB, base }, signals: [], screens: [], parked: [], turbines: [], kinds: [], protected: [] };
     const self = this;
     const roadInfo = (lu, lv) => {
       const inX = lu >= 0 && lu < SZ && (lu % P) < RW, inZ = lv >= 0 && lv < SZ && (lv % P) < RW; const k = lu % P, k2 = lv % P;
@@ -470,6 +475,8 @@ export class Settlements {
       const lx0 = x0 + RW + i * P, lz0 = z0 + RW + j * P, n = P - RW; // 19x19
       const lot = { x0: lx0, z0: lz0, n, base, centre: kind !== 'office' && inner.some((q) => q[0] === i && q[1] === j), seed: (rnd() * 1e9) | 0, plan };
       plan.kinds.push(kind);
+      // buildings are reinforced: open lots (plaza, park, parking) stay freely editable
+      if (!['plaza', 'park', 'parking'].includes(kind)) plan.protected.push([lx0, lz0, lx0 + n - 1, lz0 + n - 1]);
       const spec = this['spec_' + kind] ? this['spec_' + kind](lot) : null; lot.spec = spec;
       pieces.push({ r: [lx0, lz0, lx0 + n - 1, lz0 + n - 1], build: (S) => self['c_' + kind](S, lot) });
       const mx = lx0 + n / 2, mz = lz0 + n / 2, y = base + 1;
@@ -523,7 +530,7 @@ export class Settlements {
           if (fl === 0) id = sp.frame;
           else if (!sp.round && along) id = sp.frame;
           else id = hash3(x * 3 + (lz & 1), f, z * 7, 77) < sp.lit ? B.LIT_WINDOW : sp.glass;
-          if (ly >= 1 && ly <= 2 && lz <= a0 + 1 && Math.abs(lx - mid) <= 1) id = 0; // entrance
+          if (ly >= 1 && ly <= 2 && lz <= a0 + 1 && Math.abs(lx - mid) <= 1 && lx === mid) id = ly === 1 ? B.OAK_DOOR : B.OAK_DOOR_TOP; // a door in the entrance
         } else if (inT(t, lx, lz)) {
           if (fl === 0) { id = ly === 0 ? B.MARBLE : B.WHITE_CONCRETE; if (ly > 0 && lx % 4 === 1 && lz % 4 === 1) id = B.GLOWSTONE; }
           else if (fl === 1 && sp.office && f > 0 && lx % 4 === 3 && lz % 5 === 2 && !isCore(lx, lz + 1) && !isCore(lx, lz - 1)) { S.set(x, y, z, B.COMPUTER, (lx + lz) & 3); continue; }

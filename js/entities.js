@@ -16,6 +16,7 @@ function blockBoxes(world, x, y, z, out) {
   else if (sh === 3) out.push(x + 1 / 16, y, z + 1 / 16, x + 15 / 16, y + 1, z + 15 / 16);
   else if (sh === 5) { if (id === B.FENCE) out.push(x, y, z, x + 1, y + 1.5, z + 1); else out.push(x + 6 / 16, y, z + 6 / 16, x + 10 / 16, y + 1, z + 10 / 16); }
   else if (sh === 7) { if (world.getMeta && world.getMeta(x, y, z)) out.push(x + 7 / 16, y, z, x + 9 / 16, y + 1, z + 1); else out.push(x, y, z + 7 / 16, x + 1, y + 1, z + 9 / 16); }
+  else if (sh === 9) { const m = world.getMeta ? (world.getMeta(x, y, z) & 1) : 0; if (m) out.push(x + 7 / 16, y, z, x + 9 / 16, y + 1, z + 1); else out.push(x, y, z + 7 / 16, x + 1, y + 1, z + 9 / 16); }
   else out.push(x, y, z, x + 1, y + 1, z + 1);
 }
 function gather(world, minx, miny, minz, maxx, maxy, maxz) {
@@ -129,6 +130,7 @@ const MOBS = {
   chicken: { w: 0.22, h: 0.7, hp: 4, speed: 1.2, drops: [[I.RAW_CHICKEN, 1, 1], [I.FEATHER, 0, 2]], sound: 'chicken', passive: true },
   wolf: { w: 0.3, h: 0.85, hp: 8, speed: 2.8, drops: [], sound: 'wolf', neutral: true, dmg: 4, solo: true },
   cat: { w: 0.25, h: 0.7, hp: 10, speed: 2.2, drops: [], sound: 'cat', passive: true },
+  cod: { w: 0.24, h: 0.34, hp: 3, speed: 1.6, drops: [[I.RAW_COD, 1, 1]], passive: true, aquatic: true },
   end_crystal: { w: 0.9, h: 2, hp: 1, speed: 0, drops: [], crystal: true, fireImmune: true, persist: true },
   ender_dragon: { w: 3.2, h: 3, hp: 200, speed: 14, drops: [], sound: 'dragon', flying: true, boss: true, big: true, fireImmune: true, persist: true, dmg: 10 },
 };
@@ -257,6 +259,13 @@ function buildModel(type, opts = {}) {
       const mem = new THREE.Mesh(new THREE.BoxGeometry(5.5, 0.06, 3.2), new THREE.MeshLambertMaterial({ color: 0x3a2a48, side: THREE.DoubleSide })); mats.push(mem.material); mem.position.set(s2 * 2.75, 0, -1.5); wing.add(mem);
     }
     for (const [lx, lz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) { const l = pivot(box(0.4, 1.2, 0.4, blk, mats), lx * 0.8, 1.0, lz * 1.3, -0.6); g.add(l); legs.push(l); }
+  } else if (type === 'cod') {
+    const body = box(0.24, 0.3, 0.5, 0xc8c0a8, mats); body.position.y = 0.17; g.add(body);
+    head = new THREE.Group(); head.position.set(0, 0.17, 0.3); g.add(head);
+    const nose = box(0.18, 0.2, 0.12, 0xd8d0b8, mats); nose.position.set(0, 0, 0.03); head.add(nose);
+    const e = box(0.04, 0.04, 0.02, 0x111111, mats); e.position.set(0.07, 0.05, 0.08); head.add(e);
+    const tail = box(0.06, 0.2, 0.18, 0xb0a890, mats); tail.position.set(0, 0.17, -0.34); g.add(tail); arms.push(tail);
+    for (const s of [-1, 1]) { const fin = box(0.02, 0.1, 0.16, 0xd8d0b8, mats); fin.position.set(s * 0.13, 0.15, 0.02); g.add(fin); }
   } else if (type === 'slime') {
     const outer = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshLambertMaterial({ color: 0x6ad85a, transparent: true, opacity: 0.55 })); mats.push(outer.material); outer.position.y = 0.5; g.add(outer); arms.push(outer);
     const core = box(0.55, 0.55, 0.55, 0x3a9a30, mats); core.position.y = 0.45; g.add(core);
@@ -397,9 +406,23 @@ export class EntityManager {
     const m = { type, def, model, x, y, z, vx: 0, vy: 0, vz: 0, w: def.w, h: def.h, hp: def.hp, yaw: Math.random() * 6.28, targetYaw: 0,
       walk: 0, wanderT: 0, moving: false, hurt: 0, attackCd: 0, fuse: 0, onGround: false, dead: 0, sayT: 4 + Math.random() * 10, burn: 0, shootCd: 2, prof: opts.prof, home: opts.home || null, plan: opts.plan || null, baby: !!opts.baby, growT: opts.baby ? 120 : 0, breedCd: opts.baby || !def.villager ? 0 : 20 + Math.random() * 40, willing: 0, fireT: 0 };
     if (opts.baby) { m.h = def.h * 0.55; m.w = def.w * 0.7; }
-    m.stepH = def.flying || def.hopper || def.boss || def.crystal ? 0 : 0.6;
+    m.stepH = def.flying || def.hopper || def.boss || def.crystal || def.aquatic ? 0 : 0.6;
+    m.stuckT = 0; m.avoidDir = Math.random() < 0.5 ? 1 : -1;
     if (type === 'ghast') m.alt = y;
     this.mobs.push(m); return m;
+  }
+  mobPathOpen(m, yaw) {
+    const x = m.x + Math.sin(yaw) * 1.1, z = m.z + Math.cos(yaw) * 1.1;
+    if (collides(this.world, x - m.w, m.y + 0.02, z - m.w, x + m.w, m.y + m.h, z + m.w)) return false;
+    const floor = this.world.getBlock(Math.floor(x), Math.floor(m.y - 0.06), Math.floor(z));
+    return !!SOLID[floor] && !LIQUID[floor];
+  }
+  mobEscape(m, yaw) {
+    const side = m.avoidDir || 1;
+    for (const turn of [side * Math.PI / 2, -side * Math.PI / 2, side * Math.PI / 3, -side * Math.PI / 3, Math.PI]) {
+      const next = yaw + turn; if (this.mobPathOpen(m, next)) return next;
+    }
+    return null;
   }
   hurtMob(m, dmg, fromX, fromZ, fromPlayer = true, kb = 1) {
     if (m.dead || m.hurt > 0.35) return false;
@@ -465,6 +488,14 @@ export class EntityManager {
         if (m.lastTint !== tint3) { for (const mt of m.model.mats) mt.emissive && mt.emissive.setHex(tint3); m.lastTint = tint3; }
         continue;
       }
+      if (md.aquatic) {
+        this.updateAquatic(m, dt);
+        if (m.y < -20) { this.scene.remove(m.model.g); this.mobs.splice(i, 1); continue; }
+        m.model.g.position.set(m.x, m.y, m.z); m.model.g.rotation.y = m.yaw;
+        const tintA = m.hurt > 0.3 ? 0x991111 : 0;
+        if (m.lastTint !== tintA) { for (const mt of m.model.mats) mt.emissive && mt.emissive.setHex(tintA); m.lastTint = tintA; }
+        continue;
+      }
       if (md.flying || md.hover || md.hopper) {
         this.updateNetherMob(m, dt, distP, dxp, dzp, g.mode === 'survival' && !pl.dead);
         if (m.y < -20) { this.scene.remove(m.model.g); this.mobs.splice(i, 1); continue; }
@@ -506,8 +537,20 @@ export class EntityManager {
         if (md.golem) { speed = md.speed * 1.2; if (distP < 2.4 && m.attackCd <= 0) { m.attackCd = 1.4; m.swingT = 0.4; g.damagePlayer(md.dmg * [0.5, 0.7, 1, 1.4][g.difficulty], m.x, m.z); pl.vy = 8; } }
       } else {
         m.wanderT -= dt;
-        if (m.wanderT < 0) { m.wanderT = 2 + Math.random() * 5; m.moving = Math.random() < 0.55; m.targetYaw = Math.random() * Math.PI * 2; }
+        if (m.wanderT < 0) {
+          m.moving = Math.random() < 0.55;
+          if (m.moving) {
+            const a = Math.random() * Math.PI * 2, d = 4 + Math.random() * 6;
+            m.wanderX = m.x + Math.sin(a) * d; m.wanderZ = m.z + Math.cos(a) * d;
+            m.wanderT = 2 + d / Math.max(0.4, md.speed * 0.6);
+          } else m.wanderT = 2 + Math.random() * 5;
+        }
         if (m.panic > 0) { m.panic -= dt; m.moving = true; if (Math.random() < dt * 2) m.targetYaw = Math.random() * 6.28; }
+        else if (m.moving && m.wanderX !== undefined) {
+          const wx = m.wanderX - m.x, wz = m.wanderZ - m.z;
+          if (Math.hypot(wx, wz) < 0.8) { m.moving = false; m.wanderT = Math.min(m.wanderT, 0.8); }
+          else m.targetYaw = Math.atan2(wx, wz);
+        }
         speed = m.moving ? md.speed * (m.panic > 0 ? 2 : 0.6) : 0;
         // stay near home (villagers / golems)
         if (m.home && !(m.panic > 0)) {
@@ -533,6 +576,9 @@ export class EntityManager {
         }
         if (m.baby) speed *= 1.25;
       }
+      if ((md.passive || m.type === 'wolf') && !md.aquatic && speed > 0.1 && !(m.panic > 0) && !m.owner && !this.mobPathOpen(m, m.targetYaw)) {
+        const escape = this.mobEscape(m, m.targetYaw); if (escape !== null) m.targetYaw = escape;
+      }
       let dy = m.targetYaw - m.yaw; while (dy > Math.PI) dy -= Math.PI * 2; while (dy < -Math.PI) dy += Math.PI * 2;
       m.yaw += dy * Math.min(1, dt * 6);
       const inWater = inLiquid(w, m);
@@ -540,8 +586,20 @@ export class EntityManager {
       m.vx += (fx - m.vx) * Math.min(1, dt * 8); m.vz += (fz - m.vz) * Math.min(1, dt * 8);
       if (inWater) { m.vy += (2 - m.vy) * dt * 3; } else m.vy -= 28 * dt;
       m.vy = Math.max(m.vy, m.type === 'chicken' ? -3 : -40);
+      const oldX = m.x, oldZ = m.z;
       const hit = moveEntity(w, m, m.vx * dt, m.vy * dt, m.vz * dt);
       if ((hit.hitX || hit.hitZ) && m.onGround && speed > 0) m.vy = 8.2;
+      if ((md.passive || m.type === 'wolf') && !md.aquatic && speed > 0.15 && !m.owner) {
+        if (Math.hypot(m.x - oldX, m.z - oldZ) < Math.max(0.01, speed * dt * 0.12)) {
+          m.stuckT += dt;
+          if (m.stuckT > 0.45) {
+            const escape = this.mobEscape(m, m.targetYaw), yaw = escape ?? m.targetYaw + (m.avoidDir || 1) * Math.PI / 2;
+            m.targetYaw = m.yaw = yaw; m.wanderX = m.x + Math.sin(yaw) * 5; m.wanderZ = m.z + Math.cos(yaw) * 5;
+            m.wanderT = Math.max(m.wanderT, 1); m.avoidDir = -(m.avoidDir || 1); m.vx = m.vz = 0; m.stuckT = 0;
+            if (m.onGround) m.vy = 6.5;
+          }
+        } else m.stuckT = Math.max(0, m.stuckT - dt * 2);
+      }
       if (m.y < -20) { this.scene.remove(m.model.g); this.mobs.splice(i, 1); continue; }
       // creeper fuse / zombie attack
       if (chase) {
@@ -720,7 +778,7 @@ export class EntityManager {
       moveEntity(w, m, m.vx * dt, m.vy * dt, m.vz * dt);
       if (targetable && distP < 1.3 && m.attackCd <= 0) { m.attackCd = 1; g.damagePlayer(md.dmg * diff, m.x, m.z); }
       const stretch = m.onGround ? 0 : Math.min(1, Math.abs(m.vy) / 8);
-      m.model.arms.forEach((sl, k) => { sl.position.y = 0.12 + k * (0.24 + stretch * 0.14); });
+      m.model.arms.forEach((sl, k) => { sl.position.y = m.type === 'slime' ? 0.5 + stretch * 0.1 : 0.12 + k * (0.24 + stretch * 0.14); });
     }
     let dy = m.targetYaw - m.yaw; while (dy > Math.PI) dy -= Math.PI * 2; while (dy < -Math.PI) dy += Math.PI * 2;
     m.yaw += dy * Math.min(1, dt * 4);
@@ -737,6 +795,34 @@ export class EntityManager {
       this.burst(m.x, m.y + 1.4, m.z, [0.7, 0.3, 0.9], 14, 2, 0.1, 0.8); sfx.teleport(); return true;
     }
     return false;
+  }
+  updateAquatic(m, dt) {
+    const w = this.world, pl = this.game.player;
+    const under = w.getBlock(Math.floor(m.x), Math.floor(m.y + m.h * 0.8), Math.floor(m.z)) === B.WATER;
+    m.swimT = (m.swimT ?? 0) - dt;
+    if (m.swimT <= 0) { m.swimT = 1.5 + Math.random() * 3; m.targetYaw = Math.random() * Math.PI * 2; m.swimY = (Math.random() - 0.5) * 0.8; }
+    if (!under) m.swimY = -0.9;
+    const dp = Math.hypot(pl.x - m.x, pl.z - m.z);
+    if (dp < 4 && this.game.mode === 'survival') m.targetYaw = Math.atan2(m.x - pl.x, m.z - pl.z);
+    if (inLiquid(w, m)) {
+      const ax = m.x + Math.sin(m.yaw) * 0.9, az = m.z + Math.cos(m.yaw) * 0.9;
+      if (w.getBlock(Math.floor(ax), Math.floor(m.y), Math.floor(az)) !== B.WATER) { m.targetYaw = Math.random() * Math.PI * 2; m.swimT = 1 + Math.random(); }
+      const sp = m.def.speed;
+      m.vx += (Math.sin(m.yaw) * sp - m.vx) * Math.min(1, dt * 4);
+      m.vz += (Math.cos(m.yaw) * sp - m.vz) * Math.min(1, dt * 4);
+      m.vy += (m.swimY - m.vy) * Math.min(1, dt * 4);
+      moveEntity(w, m, m.vx * dt, m.vy * dt, m.vz * dt);
+      m.outT = 0;
+    } else {
+      m.vx *= 1 - dt * 3; m.vz *= 1 - dt * 3; m.vy -= 24 * dt;
+      moveEntity(w, m, m.vx * dt, m.vy * dt, m.vz * dt);
+      m.outT = (m.outT || 0) + dt;
+      if (m.outT > 6) { m.hurt = 0; this.hurtMob(m, 10, m.x, m.z, false, 0); }
+    }
+    let dy = m.targetYaw - m.yaw; while (dy > Math.PI) dy -= Math.PI * 2; while (dy < -Math.PI) dy += Math.PI * 2;
+    m.yaw += dy * Math.min(1, dt * 5);
+    m.walk += dt * 3;
+    m.model.arms.forEach((a, k) => { a.rotation.x = Math.sin(m.walk + k) * 0.4; });
   }
   updateEndMob(m, dt, distP, targetable) {
     const pl = this.game.player, g = this.game; const t = performance.now() / 1000;

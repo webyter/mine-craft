@@ -1,5 +1,5 @@
 {
-  "name": "mine-craft",
+  "name": "voxcraft",
   "version": "0.1.0",
   "private": true,
   "description": "Mobile-friendly voxel sandbox with an experimental multiplayer server",

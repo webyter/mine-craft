@@ -1,4 +1,4 @@
-// Mine Craft online server — shared open world, chat, DMs, friends, homes, emotes.
+// VoxCraft online server — shared open world, chat, DMs, friends, homes, emotes.
 // Run: node server/server.js  (listens on 0.0.0.0:8000, WebSocket path /ws)
 const http = require('http');
 const fs = require('fs');
@@ -9,7 +9,7 @@ const { WebSocketServer } = require('ws');
 const PORT = parseInt(process.env.PORT || '8000', 10);
 const DATA = path.join(__dirname, 'data');
 fs.mkdirSync(DATA, { recursive: true });
-const WORLD_SEED = 'mine craft online';
+const WORLD_SEED = 'voxcraft online';
 const MAX_EDITS = 1500000;
 
 function load(name, def) { try { return JSON.parse(fs.readFileSync(path.join(DATA, name), 'utf8')); } catch (_) { return def; } }
@@ -97,7 +97,7 @@ const server = http.createServer((req, res) => {
     res.end(JSON.stringify({ ok: true, online: online.size, players: Object.keys(db.profiles).length, edits: db.edits.size, homes: db.homes.filter(Boolean).length }));
     return;
   }
-  res.writeHead(200, { 'Content-Type': 'text/plain' }); res.end('Mine Craft server');
+  res.writeHead(200, { 'Content-Type': 'text/plain' }); res.end('VoxCraft server');
 });
 const wss = new WebSocketServer({ noServer: true, maxPayload: 2 * 1024 * 1024 });
 server.on('upgrade', (req, sock, head) => {
@@ -308,4 +308,4 @@ setInterval(() => {
   broadcast({ t: 'ticks', ticks: db.meta.ticks });
 }, 15000);
 
-server.listen(PORT, '0.0.0.0', () => console.log('Mine Craft server on ' + PORT));
+server.listen(PORT, '0.0.0.0', () => console.log('VoxCraft server on ' + PORT));

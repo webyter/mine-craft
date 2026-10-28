@@ -1,4 +1,4 @@
-// Mine Craft — customizable player avatars (blocky humanoid), nametags, chat bubbles, emotes
+// VoxCraft — customizable player avatars (blocky humanoid), nametags, chat bubbles, emotes
 import * as THREE from 'three';
 
 export const SKIN_TONES = ['#f6d7b8', '#eec39a', '#d9a066', '#c68642', '#a0663d', '#8d5524', '#6b3e26', '#4a2c1a'];
@@ -252,7 +252,7 @@ export class Avatar {
     const amp = flying || gliding ? 0.1 : sp * 0.9;
     const sw = Math.sin(this.walk) * amp;
     // reset
-    this.root.position.set(0, 0, 0); this.root.rotation.set(0, 0, 0); this.upper.rotation.set(0, 0, 0);
+    this.root.position.set(0, 0, 0); this.root.rotation.set(0, 0, 0); this.upper.rotation.set(0, 0, 0); this.upper.position.y = 12 * PX;
     this.legL.rotation.set(sw, 0, 0); this.legR.rotation.set(-sw, 0, 0);
     this.armL.rotation.set(-sw * 0.85, 0, 0.06); this.armR.rotation.set(sw * 0.85, 0, -0.06);
     this.head.rotation.set(-this.pitch * 0.9, 0, 0);
@@ -274,7 +274,7 @@ export class Avatar {
       else if (e === 'cheer') { const b = Math.sin(t * 12) * 0.25; this.armL.rotation.set(0, 0, 2.7 + b); this.armR.rotation.set(0, 0, -2.7 - b); this.root.position.y = Math.max(0, Math.sin(t * 6)) * 0.15; }
       else if (e === 'heart') { this.armL.rotation.set(-1.4, 0.6, 0); this.armR.rotation.set(-1.4, -0.6, 0); this.head.rotation.z = Math.sin(t * 3) * 0.15; }
       else if (e === 'sit') { this.legL.rotation.x = this.legR.rotation.x = -1.45; this.root.position.y = -0.62; this.armL.rotation.x = this.armR.rotation.x = -0.4; }
-      else if (e === 'shrug') { const k = Math.sin(Math.min(1, t / this.emoteLen) * Math.PI); this.armL.rotation.set(-0.5 * k, 0, 0.6 * k); this.armR.rotation.set(-0.5 * k, 0, -0.6 * k); this.head.rotation.z = 0.25 * k; this.upper.position && (this.upper.position.y = 12 * PX + 0.03 * k); }
+      else if (e === 'shrug') { const k = Math.sin(Math.min(1, t / this.emoteLen) * Math.PI); this.armL.rotation.set(-0.5 * k, 0, 0.6 * k); this.armR.rotation.set(-0.5 * k, 0, -0.6 * k); this.head.rotation.z = 0.25 * k; this.upper.position.y = 12 * PX + 0.03 * k; }
       else if (e === 'thumbs') { this.armR.rotation.set(-1.3, 0, -0.3); }
       else if (e === 'cry') { this.head.rotation.x = 0.5; this.armL.rotation.set(-2.2, 0.4, 0); this.armR.rotation.set(-2.2, -0.4, 0); this.upper.rotation.x = 0.15 + Math.sin(t * 14) * 0.03; }
     }

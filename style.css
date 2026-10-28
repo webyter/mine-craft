@@ -141,7 +141,7 @@ body.touch #crosshair { display: none; }
 #touch { position: absolute; inset: 0; display: none; }
 body.touch #touch { display: block; }
 #joy-zone { position: absolute; left: 0; bottom: 0; width: 38%; height: 70%; pointer-events: none; }
-#joy { position: absolute; left: calc(28px + var(--safe-l)); bottom: calc(28px + var(--safe-b)); width: calc(140px * var(--s)); height: calc(140px * var(--s)); border-radius: 50%; background: rgba(255,255,255,0.08); border: 2px solid rgba(255,255,255,0.3); pointer-events: none; }
+#joy { position: absolute; left: calc(28px + var(--safe-l)); bottom: calc(28px + var(--safe-b)); width: min(calc(34vw), calc(140px * var(--s))); height: min(calc(34vw), calc(140px * var(--s))); border-radius: 50%; background: rgba(255,255,255,0.08); border: 2px solid rgba(255,255,255,0.3); pointer-events: none; }
 #joy-knob { position: absolute; left: 50%; top: 50%; width: 44%; height: 44%; margin: -22% 0 0 -22%; border-radius: 50%; background: rgba(255,255,255,0.35); border: 2px solid rgba(255,255,255,0.6); }
 #right-btns { position: absolute; right: calc(22px + var(--safe-r)); bottom: calc(26px + var(--safe-b)); width: calc(170px * var(--s)); height: calc(160px * var(--s)); pointer-events: none; }
 .tbtn { position: absolute; pointer-events: auto; width: calc(58px * var(--s)); height: calc(58px * var(--s)); padding: 14px; color: #fff; background: rgba(30,30,30,0.45); border: 2px solid rgba(255,255,255,0.4); }
@@ -151,6 +151,17 @@ body.touch #touch { display: block; }
 #btn-jump { right: 0; bottom: calc(10px * var(--s)); }
 #btn-sneak { right: calc(86px * var(--s)); bottom: 0; }
 #btn-down { right: 0; bottom: calc(90px * var(--s)); }
+/* keep the touch controls clear of the hotbar, hearts and xp bar */
+body.touch #joy { bottom: calc(var(--slot-size) * 2.1 + 46px + var(--safe-b)); }
+body.touch #right-btns { bottom: calc(var(--slot-size) * 2.1 + 46px + var(--safe-b)); }
+@media (orientation: landscape) and (max-height: 480px) {
+  body.touch #joy { bottom: calc(var(--slot-size) * 2.1 + 16px + var(--safe-b)); transform: scale(0.84); transform-origin: bottom left; }
+  body.touch #right-btns { bottom: calc(var(--slot-size) * 2.1 + 16px + var(--safe-b)); transform: scale(0.84); transform-origin: bottom right; }
+}
+@media (max-width: 370px) {
+  .hud-btn { width: calc(36px * var(--s)); height: calc(36px * var(--s)); padding: 7px; }
+  #top-right { gap: 5px; }
+}
 #breakring { position: absolute; width: 54px; height: 54px; margin: -27px 0 0 -27px; border-radius: 50%; border: 3px solid rgba(255,255,255,0.0); pointer-events: none;
   background: conic-gradient(rgba(255,255,255,0.75) calc(var(--p, 0) * 1turn), rgba(255,255,255,0.12) 0); -webkit-mask: radial-gradient(circle, transparent 55%, #000 57%); mask: radial-gradient(circle, transparent 55%, #000 57%); }
 
@@ -247,11 +258,12 @@ body:has(#pause:not(.hidden)) #hud, body:has(#settings:not(.hidden)) #hud, body:
 /* ---------- modern tech ---------- */
 #touch.driving #right-btns, #touch.driving #btn-sneak { display: none; }
 #car-hud { position: absolute; inset: 0; pointer-events: none; z-index: 6; }
-#car-dash { position: absolute; left: 50%; bottom: 96px; transform: translateX(-50%); background: rgba(10,14,22,.72); color: #e8f2ff; border: 1px solid rgba(120,180,255,.4); border-radius: 14px; padding: 6px 16px; display: flex; gap: 16px; align-items: center; font-family: system-ui, sans-serif; }
+#car-dash { position: absolute; left: 50%; bottom: calc(var(--slot-size) * 2.1 + 84px + var(--safe-b)); transform: translateX(-50%); background: rgba(10,14,22,.72); color: #e8f2ff; border: 1px solid rgba(120,180,255,.4); border-radius: 14px; padding: 6px 16px; display: flex; gap: 16px; align-items: center; font-family: system-ui, sans-serif; }
 #car-dash b { font-size: 26px; font-variant-numeric: tabular-nums; } #car-dash small { margin-left: 4px; opacity: .7; }
 #car-dash .batt { font-size: 12px; opacity: .9; } #car-batt.low { color: #ff6a5a; }
-#car-btns { position: absolute; right: calc(18px + env(safe-area-inset-right)); bottom: 28px; display: flex; gap: 10px; align-items: flex-end; pointer-events: auto; }
-#car-btns .tbtn { font: 700 12px system-ui, sans-serif; color: #fff; }
+#car-btns { position: absolute; right: calc(18px + var(--safe-r)); bottom: calc(var(--slot-size) * 2.1 + 22px + var(--safe-b)); display: flex; gap: 10px; align-items: flex-end; pointer-events: auto; }
+#car-btns .tbtn { position: static; padding: 0; width: calc(74px * var(--s)); height: calc(46px * var(--s)); font: 700 12px system-ui, sans-serif; color: #fff; }
+#car-btns .tbtn.big { width: calc(86px * var(--s)); height: calc(54px * var(--s)); font-size: 14px; }
 #waypoint { position: absolute; top: 10px; left: 50%; transform: translateX(-50%); background: rgba(10,14,22,.7); color: #fff; padding: 5px 12px; border-radius: 16px; font: 600 13px system-ui, sans-serif; display: flex; gap: 8px; align-items: center; pointer-events: none; }
 #waypoint .wp-arrow { display: inline-block; color: #5ad1ff; font-size: 16px; transition: transform .1s; }
 #device { position: absolute; inset: 0; z-index: 30; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,.45); pointer-events: auto; }

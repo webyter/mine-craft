@@ -13,7 +13,7 @@ const M = 8, R = CS + M * 2, RH = H + 2, RR = R * R;
 // property tables
 export const OPAQUE = new Uint8Array(256), FILTER = new Uint8Array(256), EMIT = new Uint8Array(256),
   SOLID = new Uint8Array(256), TRANSL = new Uint8Array(256), LIQUID = new Uint8Array(256), CUTOUT = new Uint8Array(256), CULLSAME = new Uint8Array(256), SHAPE = new Uint8Array(256);
-const SHAPES = { cube: 0, cross: 1, torch: 2, cactus: 3, slab: 4, post: 5, table: 6, pane: 7, ladder: 8 };
+const SHAPES = { cube: 0, cross: 1, torch: 2, cactus: 3, slab: 4, post: 5, table: 6, pane: 7, ladder: 8, door: 9 };
 export function initTables() {
   for (const b of BLOCKS) {
     if (!b) continue;
@@ -189,6 +189,19 @@ export class World {
     };
     const getL = (x, y, z) => { x -= bx; z -= bz; if (x < 0 || z < 0 || x >= CS || z >= CS || y < 0 || y >= H) return -1; return bl[lidx(x, y, z)]; };
     const rects = this.settle.applyChunk(bx, bz, setM, getL);
+    // seagrass meadows on shallow sea floors (never directly under the surface)
+    if (this.type === 'infinite') {
+      for (let z = 0; z < CS; z++) for (let x = 0; x < CS; x++) {
+        const h = heights[z * CS + x];
+        if (h >= SEA - 2 || h < SEA - 16) continue;
+        const ground = bl[lidx(x, h, z)];
+        if (ground !== B.SAND && ground !== B.DIRT && ground !== B.GRAVEL && ground !== B.CLAY) continue;
+        const i = lidx(x, h + 1, z);
+        if (bl[i] !== B.WATER) continue;
+        if (hash3(bx + x, 33, bz + z, seed) > 0.11) continue;
+        bl[i] = B.SEAGRASS;
+      }
+    }
     const settled = (wx, wz, m) => { for (const r of rects) if (wx >= r[0] - m && wx <= r[2] + m && wz >= r[1] - m && wz <= r[3] + m) return true; return false; };
     if (this.type === 'flat') return chunk;
     for (let z = -3; z < CS + 3; z++) for (let x = -3; x < CS + 3; x++) {
@@ -284,6 +297,15 @@ export class World {
     return sky;
   }
   topSolid(x, z) { for (let y = H - 1; y > 0; y--) { const id = this.getBlock(x, y, z); if (SOLID[id] || LIQUID[id]) return y; } return 0; }
+  // true for city building lots (not their plazas, parks or parking) — these are reinforced
+  isBuilding(x, z) {
+    if (!this.settle || this.type !== 'infinite') return false;
+    x = Math.floor(x); z = Math.floor(z);
+    const p = this.settle.at(x, z);
+    if (!p || !p.protected || !p.protected.length) return false;
+    for (const r of p.protected) if (x >= r[0] && x <= r[2] && z >= r[1] && z <= r[3]) return true;
+    return false;
+  }
   // ---------- raycast ----------
   raycast(ox, oy, oz, dx, dy, dz, maxDist, hitFn) {
     let x = Math.floor(ox), y = Math.floor(oy), z = Math.floor(oz);
@@ -373,9 +395,16 @@ export class World {
       const id = ids[ri]; if (!id) continue;
       const b = BLOCKS[id]; const shape = SHAPE[id];
       if (shape === 1 || shape === 2 || shape === 8) { // cross / torch / ladder
-        const s = sky[ri] / 15, bk = blk[ri] / 15; const t = b.tiles.side;
+        const isSea = id === B.SEAGRASS;
+        // submerged plants keep a little ambient light, otherwise they render almost black
+        const s = isSea ? Math.max(0.55, sky[ri] / 15) : sky[ri] / 15, bk = isSea ? Math.max(0.25, blk[ri] / 15) : blk[ri] / 15;
+        const t = b.tiles.side;
         if (shape === 8) this.ladder(solid, x, y, z, t, s, bk, meta[lidx(x, y, z)]);
-        else if (shape === 1) this.cross(solid, x, y, z, t, s, bk);
+        else if (shape === 1) {
+          const wx = cx * CS + x, wz = cz * CS + z;
+          const rot = isSea ? hash3(wx, 7, wz, this.seed) * Math.PI : 0;
+          this.cross(solid, x, y, z, t, s, bk, rot, isSea ? 0.9 : 1);
+        }
         else this.torch(solid, x, y, z, t, s, bk);
         continue;
       }
@@ -384,7 +413,7 @@ export class World {
       const aboveSame = ids[ri + RR] === id;
       const topH = liquid && !aboveSame ? Math.max(0.2, 0.875 - meta[lidx(x, y, z)] * 0.1) : shape === 4 ? 0.5625 : shape === 6 ? 0.75 : 1;
       const m = b.tiles.front !== b.tiles.side ? meta[lidx(x, y, z)] : -1;
-      const pax = shape === 7 ? meta[lidx(x, y, z)] : 0;
+      const pax = shape === 7 || shape === 9 ? meta[lidx(x, y, z)] : 0;
       for (let f = 0; f < 6; f++) {
         const F = FACES[f];
         const nri = ri + F.nOff; const nid = ids[nri];
@@ -402,6 +431,12 @@ export class World {
           if (shape === 3 && F.n[1] === 0) { if (F.n[0]) px = px ? 15 / 16 : 1 / 16; if (F.n[2]) pz = pz ? 15 / 16 : 1 / 16; }
           else if (shape === 5) { px = px ? 10 / 16 : 6 / 16; pz = pz ? 10 / 16 : 6 / 16; }
           else if (shape === 7) { if (pax) px = px ? 9 / 16 : 7 / 16; else pz = pz ? 9 / 16 : 7 / 16; }
+          else if (shape === 9) {
+            // doors: a closed door is a thin panel in the middle, an open one swings flat against its hinge
+            const open = id === B.OAK_DOOR_OPEN || id === B.OAK_DOOR_OPEN_TOP;
+            if (open) { if (pax) pz = pz ? 2 / 16 : 0; else px = px ? 2 / 16 : 0; }
+            else { if (pax) px = px ? 9 / 16 : 7 / 16; else pz = pz ? 9 / 16 : 7 / 16; }
+          }
           pos[v * 3] = x + px; pos[v * 3 + 1] = y + py; pos[v * 3 + 2] = z + pz;
           let [lu, lv] = F.uv[v]; if (F.side === 'side' && topH < 1 && cc[1] === 1) lv = topH;
           const uv = tileUV(tile, lu, lv); uvs[v * 2] = uv[0]; uvs[v * 2 + 1] = uv[1];
@@ -424,15 +459,18 @@ export class World {
     chunk.dirty = false; chunk.urgent = false; chunk.built = true;
     return { solid: solid.geometry(), water: water.geometry() };
   }
-  cross(buf, x, y, z, t, s, bk) {
-    const quads = [[[0.15, 0, 0.15], [0.85, 0, 0.85], [0.85, 1, 0.85], [0.15, 1, 0.15]], [[0.85, 0, 0.15], [0.15, 0, 0.85], [0.15, 1, 0.85], [0.85, 1, 0.15]]];
+  cross(buf, x, y, z, t, s, bk, rot = 0, hh = 1) {
+    const base = [[[0.15, 0, 0.15], [0.85, 0, 0.85], [0.85, 1, 0.85], [0.15, 1, 0.15]], [[0.85, 0, 0.15], [0.15, 0, 0.85], [0.15, 1, 0.85], [0.85, 1, 0.15]]];
+    const co = Math.cos(rot), si = Math.sin(rot);
+    const turn = (px, pz) => { const dx = px - 0.5, dz = pz - 0.5; return [0.5 + dx * co - dz * si, 0.5 + dx * si + dz * co]; };
     const l = [s, bk, 0.9, s, bk, 0.9, s, bk, 0.9, s, bk, 0.9];
     const uvl = [[0, 0], [1, 0], [1, 1], [0, 1]];
-    for (const q of quads) {
+    for (const q of base) {
+      const pts = q.map(([px, py, pz]) => { const [rx, rz] = turn(px, pz); return [x + rx, y + py * hh, z + rz]; });
       for (const rev of [false, true]) {
         const order = rev ? [3, 2, 1, 0] : [0, 1, 2, 3];
         const p = [], uv = [];
-        for (const o of order) { p.push(x + q[o][0], y + q[o][1], z + q[o][2]); const u = tileUV(t, uvl[o][0], uvl[o][1]); uv.push(u[0], u[1]); }
+        for (const o of order) { const pt = pts[o]; p.push(pt[0], pt[1], pt[2]); const u = tileUV(t, uvl[o][0], uvl[o][1]); uv.push(u[0], u[1]); }
         buf.quad(p, uv, l, false);
       }
     }

@@ -157,7 +157,6 @@ function buildEndCity(w, p, set, bx, bz, inC) {
   // stairs spiral (inside the ring)
   for (let y = p.y + 1; y < top; y++) {
     const i = (y - p.y - 1) % ring.length; const [dx, dz] = ring[i]; set(p.x + dx, y, p.z + dz, B.PURPUR);
-    for (let k = 1; k <= 2; k++) { const [ex, ez] = ring[(i + k) % ring.length]; void ex; void ez; }
     for (let up = 1; up <= 3; up++) { const yy = y + up; const lvl = (yy - p.y) % FH; if (lvl === 0 && yy !== top) set(p.x + dx, yy, p.z + dz, 0); }
   }
   // top floor: chests + end rods
