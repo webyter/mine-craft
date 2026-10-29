@@ -28,6 +28,7 @@ The server listens on port 8000 by default and exposes the WebSocket endpoint `/
 ## Multiplayer data and deployment
 
 - Single-player worlds are saved in the browser (name, seed, game mode, inventory, position and every block you change), with autosave every 25 seconds and on Save, quitting, or leaving the page. The title screen offers **Continue** for the saved world.
+- When browser storage is blocked or unavailable (for example in a sandboxed preview iframe), single-player saves go to the VoxCraft server instead, under `server/data/saves/`. Everyone using the same server shares the `default` save slot; add `?save=NAME` to the page URL (letters, digits, `_` or `-`, up to 40 characters) to use a separate slot. This fallback has no authentication, so do not rely on it for private data. Server saves are limited to 8 MB.
 - The Node server source is included in `server/server.js`. Runtime world edits, profiles, homes, messages, and reports are saved under `server/data/`, which is intentionally excluded from Git.
 - The shared overworld is experimental. Nether and End worlds and mob simulation are client-side.
 - Identity currently relies on a visitor identifier rather than secure account authentication. Outside the preview environment, the client generates a new visitor identifier on reload, so ownership is not guaranteed to persist across visits.

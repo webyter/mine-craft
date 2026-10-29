@@ -1,4 +1,5 @@
 // Procedural pixel-art texture atlas + item icons
+import { drawItem } from './itemart.js';
 import { mulberry32 } from './noise.js';
 import { BLOCKS, I, isTool, toolInfo, isBlock, isArmor, armorInfo } from './blocks.js';
 
@@ -495,6 +496,7 @@ function blob(g, colA, colB, seed, shape = 'round') {
   drawMap(g, rows, { h: mix(colA, '#ffffff', 0.4), a: colA, b: colB, d: mix(colB, '#000000', 0.3) });
 }
 function itemIcon(id) {
+  const hd = drawItem(id); if (hd) return hd.toDataURL();
   const c = document.createElement('canvas'); c.width = c.height = 18; const g = c.getContext('2d');
   const art = ART[id];
   if (art) { drawMap(g, art.rows, typeof art.cols === 'function' ? art.cols(id) : art.cols); return c.toDataURL(); }

@@ -226,6 +226,15 @@ body:has(#pause:not(.hidden)) #hud, body:has(#settings:not(.hidden)) #hud, body:
 @media (orientation: portrait) {
   #right-btns, #joy { bottom: calc(110px + var(--safe-b)); }
 }
+/* narrow portrait screens: the top button row spans the width, so drop the coordinates below it */
+@media (orientation: portrait) and (max-width: 640px) {
+  #top-left { top: calc(16px + 42px * var(--s)); }
+  #rotate-hint { top: calc(40px + 42px * var(--s)); }
+}
+@media (orientation: portrait) and (max-width: 370px) {
+  #top-left { top: calc(13px + 36px * var(--s)); }
+  #rotate-hint { top: calc(36px + 36px * var(--s)); }
+}
 
 /* Villager trading */
 .trade-list { display: flex; flex-direction: column; gap: 4px; max-height: calc(100dvh - 130px); overflow-y: auto; touch-action: pan-y; padding-right: 2px; }

@@ -12,9 +12,10 @@ import { initAudio, sfx, audioSettings, setVolumes } from './audio.js';
 import { Vehicles } from './vehicles.js';
 import { Tech } from './tech.js';
 import { Net } from './net.js';
-import { Avatar } from './avatar.js';
+import { Avatar, armMaterials } from './avatar.js';
 import { createSocial } from './social.js';
 import { createWorldMap } from './worldmap.js';
+import { initStorage, getCachedSave, writeSave, clearSave as clearStoredSave, firstTime } from './storage.js';
 
 THREE.ColorManagement.enabled = false;
 const $ = (id) => document.getElementById(id);
@@ -44,7 +45,17 @@ function resize() {
   renderer.setPixelRatio(pr);
   renderer.setSize(innerWidth, innerHeight, false);
   camera.aspect = handCam.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); handCam.updateProjectionMatrix();
-  $('rotate-hint').classList.toggle('hidden', !(isTouch && innerHeight > innerWidth && game.state === 'playing'));
+  updateRotateHint();
+}
+// a short reminder each time play starts in portrait, then it gets out of the way
+let rotateHintOn = false, rotateHintT = 0;
+function updateRotateHint() {
+  const want = isTouch && innerHeight > innerWidth && game.state === 'playing';
+  if (want && !rotateHintOn) {
+    $('rotate-hint').classList.remove('hidden');
+    clearTimeout(rotateHintT); rotateHintT = setTimeout(() => $('rotate-hint').classList.add('hidden'), 5000);
+  } else if (!want) { clearTimeout(rotateHintT); $('rotate-hint').classList.add('hidden'); }
+  rotateHintOn = want;
 }
 
 // ---------- atlas + materials ----------
@@ -141,8 +152,33 @@ function setCrack(stage) {
 
 // hand
 const hand = new THREE.Group(); handScene.add(hand);
-const armMesh = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.22, 0.8), new THREE.MeshLambertMaterial({ color: 0xc9946a }));
-let heldMesh = null; const heldTexCache = {};
+const armMesh = new THREE.Group();
+const armInner = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.8, 0.22), armMaterials(null)); armInner.rotation.x = Math.PI / 2; armMesh.add(armInner);
+function setArmSkin(S) { const old = armInner.material; armInner.material = armMaterials(S); for (const m of old) { if (m.map) m.map.dispose(); m.dispose(); } }
+function lightHand(l) { for (const m of armInner.material) m.color.setScalar(m.userData.k * l); if (heldMesh && heldMesh.material.isMeshBasicMaterial) { const t = heldMesh.userData.tint || [1, 1, 1]; heldMesh.material.color.setRGB(t[0] * l, t[1] * l, t[2] * l); } }
+let heldMesh = null; const heldTexCache = {}, heldGeoCache = {};
+// turn a 2D item icon into a chunky voxel-extruded 3D model (front/back faces + side walls per opaque pixel)
+function extrudeIcon(img, size = 0.46) {
+  const n = img.naturalWidth || img.width, c = document.createElement('canvas'); c.width = c.height = n;
+  const g = c.getContext('2d'); g.drawImage(img, 0, 0); const d = g.getImageData(0, 0, n, n).data;
+  const A = (x, y) => (x < 0 || y < 0 || x >= n || y >= n ? 0 : d[(y * n + x) * 4 + 3]) > 90;
+  const pos = [], nor = [], col = [], s = size / n, th = Math.max(s * 1.6, 0.02) / 2, o = size / 2;
+  const quad = (p, nn, r, gg, b) => { for (const i of [0, 1, 2, 0, 2, 3]) { pos.push(...p[i]); nor.push(...nn); col.push(r, gg, b); } };
+  for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) {
+    if (!A(x, y)) continue; const i = (y * n + x) * 4; const r = d[i] / 255, gg = d[i + 1] / 255, b = d[i + 2] / 255;
+    const x0 = x * s - o, x1 = x0 + s, y1 = o - y * s, y0 = y1 - s;
+    quad([[x0, y0, th], [x1, y0, th], [x1, y1, th], [x0, y1, th]], [0, 0, 1], r, gg, b);
+    quad([[x1, y0, -th], [x0, y0, -th], [x0, y1, -th], [x1, y1, -th]], [0, 0, -1], r * 0.85, gg * 0.85, b * 0.85);
+    const k = 0.78; // side walls slightly darker
+    if (!A(x, y - 1)) quad([[x0, y1, th], [x1, y1, th], [x1, y1, -th], [x0, y1, -th]], [0, 1, 0], r * 0.92, gg * 0.92, b * 0.92);
+    if (!A(x, y + 1)) quad([[x0, y0, -th], [x1, y0, -th], [x1, y0, th], [x0, y0, th]], [0, -1, 0], r * k, gg * k, b * k);
+    if (!A(x - 1, y)) quad([[x0, y0, -th], [x0, y0, th], [x0, y1, th], [x0, y1, -th]], [-1, 0, 0], r * k, gg * k, b * k);
+    if (!A(x + 1, y)) quad([[x1, y0, th], [x1, y0, -th], [x1, y1, -th], [x1, y1, th]], [1, 0, 0], r * k, gg * k, b * k);
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); geo.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3)); geo.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+  return geo;
+}
 function rebuildHand() {
   if (heldMesh) { hand.remove(heldMesh); heldMesh = null; }
   hand.remove(armMesh);
@@ -152,10 +188,19 @@ function rebuildHand() {
     heldMesh = new THREE.Mesh(blockGeometry(h.id, 0.36), new THREE.MeshLambertMaterial({ map: atlasTex, alphaTest: 0.5 }));
     heldMesh.rotation.set(0.1, 0.75, 0); heldMesh.position.set(0, 0.05, 0);
   } else {
-    let t = heldTexCache[h.id];
-    if (!t) { const img = new Image(); img.src = iconFor(h.id); t = new THREE.Texture(img); img.onload = () => (t.needsUpdate = true); t.magFilter = t.minFilter = THREE.NearestFilter; t.generateMipmaps = false; heldTexCache[h.id] = t; }
-    heldMesh = new THREE.Mesh(new THREE.PlaneGeometry(0.55, 0.55), new THREE.MeshLambertMaterial({ map: t, transparent: true, alphaTest: 0.4, side: THREE.DoubleSide }));
-    heldMesh.rotation.set(0, -1.2, 0.15); heldMesh.position.set(0, 0.12, 0);
+    const geo = heldGeoCache[h.id];
+    if (geo) { heldMesh = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ vertexColors: true })); if (h.ench) heldMesh.userData.tint = [1.05, 0.82, 1.25]; }
+    else {
+      // flat icon until the voxel model is ready, then swap it in
+      let t = heldTexCache[h.id];
+      if (!t) {
+        const img = new Image(); t = new THREE.Texture(img); t.magFilter = t.minFilter = THREE.NearestFilter; t.generateMipmaps = false; heldTexCache[h.id] = t;
+        img.onload = () => { t.needsUpdate = true; try { heldGeoCache[h.id] = extrudeIcon(img); } catch (e) { return; } const cur = game.inv.held(); if (cur && cur.id === h.id) rebuildHand(); };
+        img.src = iconFor(h.id);
+      }
+      heldMesh = new THREE.Mesh(new THREE.PlaneGeometry(0.55, 0.55), new THREE.MeshLambertMaterial({ map: t, transparent: true, alphaTest: 0.4, side: THREE.DoubleSide }));
+    }
+    if (geo) { heldMesh.rotation.set(-0.15, -1.05, 0.2); heldMesh.position.set(0.02, 0.1, 0); } else { heldMesh.rotation.set(0, -1.2, 0.15); heldMesh.position.set(0, 0.12, 0); }
   }
   if (h.ench && heldMesh.material.emissive) { heldMesh.material.emissive.setHex(0x5a2a9a); heldMesh.material.emissiveIntensity = 0.55; }
   hand.add(heldMesh);
@@ -288,8 +333,6 @@ function resetPlayer() {
 }
 
 // ---------- saving single-player worlds ----------
-const SAVE_KEY = 'voxcraft.save.v1';
-const LEGACY_SAVE_KEY = 'minecraft.save.v1';
 let saveT = 25;
 const slotOut = (s) => (s ? [s.id, s.count, s.dur | 0, s.ench || null] : 0);
 function collectSave() {
@@ -307,28 +350,21 @@ function collectSave() {
     edits: [...game.saveEdits.values()],
   };
 }
-function saveGame(force) {
+// resolves to true when the world was stored; a forced save reports why it failed
+async function saveGame(force, opts) {
   if (!game.world || game.online || game.state === 'title' || !game.saveEdits) return false;
-  try {
-    localStorage.setItem(SAVE_KEY, JSON.stringify(collectSave()));
-    try { localStorage.removeItem(LEGACY_SAVE_KEY); } catch (_) { /* ignore */ }
-    game.saveDirty = false; return true;
-  }
-  catch (e) { if (force) toast('Could not save: storage is full', 2600); return false; }
+  const wasDirty = game.saveDirty; game.saveDirty = false;
+  const r = await writeSave(collectSave(), opts);
+  if (r.ok) return true;
+  if (wasDirty) game.saveDirty = true;
+  if (force) toast(r.message, 2600);
+  return false;
 }
-function readSave() {
-  try {
-    let raw = localStorage.getItem(SAVE_KEY);
-    if (!raw) { raw = localStorage.getItem(LEGACY_SAVE_KEY); if (raw) { try { localStorage.setItem(SAVE_KEY, raw); localStorage.removeItem(LEGACY_SAVE_KEY); } catch (_) { /* ignore */ } } }
-    if (!raw) return null; const s = JSON.parse(raw); return s && s.v ? s : null;
-  } catch (_) { return null; }
-}
-function clearSave() { try { localStorage.removeItem(SAVE_KEY); } catch (_) { /* ignore */ } }
+function readSave() { return getCachedSave(); }
+function clearSave() { clearStoredSave(); }
 // one-time control hints for a brand new player
 function firstRunTips() {
-  let seen = '1';
-  try { seen = localStorage.getItem('voxcraft.tips') || ''; if (!seen) localStorage.setItem('voxcraft.tips', '1'); } catch (_) { return; }
-  if (seen || game.online) return;
+  if (!firstTime('tips') || game.online) return;
   setTimeout(() => toast('Drag the left side to walk, the right side to look', 3400), 1400);
   setTimeout(() => toast('Hold a block to mine it, tap a face to place', 3400), 5200);
   setTimeout(() => toast('Tap ••• by the hotbar for crafting and your inventory', 3400), 9000);
@@ -600,7 +636,8 @@ function die(cause) {
   player.dead = true; player.health = 0;
   for (let i = 0; i < 36; i++) { const s = game.inv.slots[i]; if (s) ents.dropItem(s.id, s.count, player.x, player.y + 1, player.z, (Math.random() - 0.5) * 6, 4, (Math.random() - 0.5) * 6, s.dur, s.ench); }
   game.inv.clear(); const lv = player.level; player.level = 0; player.xp = 0;
-  $('death-msg').textContent = 'Steve ' + (DEATH_MSG[cause] || 'died');
+  let who = 'Steve'; try { if (social && social.name) who = social.name; } catch (_) { /* social UI not ready yet */ }
+  $('death-msg').textContent = who + ' ' + (DEATH_MSG[cause] || 'died');
   $('death-score').textContent = 'Score: ' + (lv * 7 + game.stats.mined);
   $('death').classList.remove('hidden');
   endPointer();
@@ -1881,7 +1918,7 @@ function runCommand(v) {
   else if (c === 'car') { if (game.dim !== 'overworld') { chatLog('Cars only work in the Overworld'); return; } const fx = -Math.sin(player.yaw), fz = -Math.cos(player.yaw); const kind = ['bus', 'police', 'taxi'].includes(a[0]) ? a[0] : 'car'; vehicles.add({ x: player.x + fx * 4, y: player.y + 0.5, z: player.z + fz * 4, yaw: player.yaw + Math.PI, kind, owned: true, color: kind === 'taxi' ? 0xf0c020 : kind === 'bus' ? 0x2a7ad8 : kind === 'police' ? 0x1a2a6a : undefined }); chatLog('Spawned a ' + kind); }
   else if (c === 'phone') { tech.phone(); }
   else if (c === 'difficulty') { const d = parseInt(a[0], 10); if (d >= 0 && d <= 3) { game.difficulty = d; chatLog('Difficulty ' + ['Peaceful', 'Easy', 'Normal', 'Hard'][d]); } }
-  else if (c === 'kill') { if (game.mode === 'survival') { player.hurtCd = 0; game.damagePlayer(999, undefined, undefined, 'void'); } }
+  else if (c === 'kill') { if (game.mode === 'survival') { player.hurtCd = 0; game.damagePlayer(999, undefined, undefined, 'kill'); } }
   else if (c === 'seed') chatLog('Seed: ' + game.seedText);
   else if (c === 'spawnpoint') { player.spawn = { x: player.x, y: player.y, z: player.z }; chatLog('Spawn point set'); }
   else if (c === 'heal') { player.health = 20; player.food = 20; chatLog('Healed'); }
@@ -1905,7 +1942,10 @@ $('btn-exit-car').addEventListener('pointerdown', (e) => { e.stopPropagation(); 
 $('btn-horn').addEventListener('pointerdown', (e) => { e.stopPropagation(); initAudio(); sfx.horn(); });
 for (const id of ['device', 'car-hud', 'waypoint']) for (const ev of ['pointerdown', 'touchstart']) $(id).addEventListener(ev, (e) => e.stopPropagation(), { passive: true });
 $('btn-resume').onclick = resume;
-$('btn-save').onclick = () => { if (saveGame(true)) { toast('World saved', 1500); resume(); } };
+$('btn-save').onclick = async () => {
+  const btn = $('btn-save'); if (btn.disabled) return; btn.disabled = true;
+  try { if (await saveGame(true)) { toast('World saved', 1500); resume(); } } finally { btn.disabled = false; }
+};
 $('btn-mode').onclick = () => { setMode(game.mode === 'creative' ? 'survival' : 'creative'); };
 $('btn-time').onclick = () => { const base = Math.floor(game.ticks / 24000) * 24000; game.ticks = base + (game.daylight > 0.5 ? 13800 : 24000 + 1000); setTimeout(updateTimeBtn, 50); };
 $('btn-quit').onclick = () => { resume(); toTitle(); };
@@ -2272,8 +2312,8 @@ function updateSky(dt, camPos) {
   stars.material.opacity = Math.max(0, 1 - t * 1.6) * (game.raining ? 0 : 0.9);
   sunLight.position.copy(camPos).addScaledVector(dir.y > 0 ? dir : dir.clone().negate(), 50); sunLight.target.position.copy(camPos);
   sunLight.intensity = 0.55 * dl; ambient.intensity = 0.25 + 0.6 * dl;
-  handAmb.intensity = 0.35 + 0.6 * dl;
-  if (nether || isEnd) { sunLight.intensity = 0.15; ambient.intensity = 0.6; handAmb.intensity = 0.7; }
+  handAmb.intensity = 0.35 + 0.6 * dl; lightHand(0.45 + 0.55 * dl);
+  if (nether || isEnd) { sunLight.intensity = 0.15; ambient.intensity = 0.6; handAmb.intensity = 0.7; lightHand(0.85); }
   // clouds
   const size = Math.max(400, settings.rd * CS * 4); clouds.scale.set(size, size, 1);
   clouds.position.set(camPos.x, 150, camPos.z);
@@ -2480,9 +2520,13 @@ titleCam.x = player.x + 6; titleCam.z = player.z + 6;
 player.x = titleCam.x; player.z = titleCam.z; player.y = 50;
 startLoading('title');
 // offer the saved world on the title screen, and keep it safe when the page goes away
-if (readSave()) showContinueButton(false);
-addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') saveGame(); });
-addEventListener('beforeunload', () => { saveGame(); });
+// the save may arrive while the title panorama is still loading, so offer it then too
+initStorage().then((s) => {
+  const onTitle = game.state === 'title' || (game.state === 'loading' && loadingTarget === 'title');
+  if (s && onTitle && !$('btn-continue')) showContinueButton(false);
+});
+addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') saveGame(false, { keepalive: true }); });
+addEventListener('beforeunload', () => { saveGame(false, { keepalive: true }); });
 requestAnimationFrame(frame);
 void [SOLID, OPAQUE, FUEL, iconFor, isTool, NETHER_BIOMES];
 
@@ -2500,7 +2544,7 @@ selfAv = new Avatar(null, '', { noTag: true }); selfAv.group.visible = false; sc
 const social = createSocial({
   net, game, player, show, toast: (m) => toast(m, 2200), endPointer,
   resume: () => { game.overlay = null; if (game.world && game.state !== 'title') { show(null); $('hud').classList.remove('hidden'); game.state = 'playing'; } },
-  onSkin: (sk) => { selfAv.build(sk); },
+  onSkin: (sk) => { selfAv.build(sk); setArmSkin(sk); },
   startOnline, leaveOnline: () => toTitle(),
   playEmote, cycleCamera, openMap: () => worldMap.show(),
   goHome, travelTo,

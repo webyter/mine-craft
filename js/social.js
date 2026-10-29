@@ -59,7 +59,7 @@ export function createSocial(ctx) {
   function ensurePreview() {
     if (pr) return pr;
     const canvas = $('ol-canvas'); const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: false, preserveDrawingBuffer: false });
-    renderer.setPixelRatio(Math.min(2, devicePixelRatio)); renderer.setSize(200, 280, false);
+    renderer.outputColorSpace = THREE.LinearSRGBColorSpace; renderer.setPixelRatio(Math.min(3, Math.max(2, devicePixelRatio))); renderer.setSize(200, 280, false);
     const scene = new THREE.Scene(); scene.add(new THREE.AmbientLight(0xffffff, 0.9)); const d = new THREE.DirectionalLight(0xffffff, 1.4); d.position.set(2, 3, -4); scene.add(d);
     const cam = new THREE.PerspectiveCamera(32, 200 / 280, 0.1, 50); cam.position.set(0, 1.1, -4.6); cam.lookAt(0, 0.95, 0);
     const av = new Avatar(skin, '', { noTag: true }); scene.add(av.group);

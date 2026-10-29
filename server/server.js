@@ -91,7 +91,55 @@ function plotOwnerAt(x, z, origin) {
 }
 
 // ---------- http + ws ----------
+// single-player saves for clients that cannot use browser storage (e.g. sandboxed previews)
+const SAVES = path.join(DATA, 'saves');
+fs.mkdirSync(SAVES, { recursive: true });
+const MAX_SAVE_BYTES = 8 * 1024 * 1024;
+const SAVE_CORS = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET, PUT, DELETE, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type',
+};
+function saveReply(res, code, body) {
+  res.writeHead(code, { ...SAVE_CORS, 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
+  res.end(body === undefined ? '' : JSON.stringify(body));
+}
+function handleSave(req, res, slot) {
+  const file = path.join(SAVES, slot + '.json');
+  if (req.method === 'OPTIONS') { res.writeHead(204, SAVE_CORS); res.end(); return; }
+  if (req.method === 'GET') {
+    fs.readFile(file, 'utf8', (err, raw) => {
+      if (err) { saveReply(res, 404, { error: 'no save' }); return; }
+      res.writeHead(200, { ...SAVE_CORS, 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }); res.end(raw);
+    });
+    return;
+  }
+  if (req.method === 'DELETE') { fs.rm(file, { force: true }, () => saveReply(res, 204)); return; }
+  if (req.method !== 'PUT') { saveReply(res, 405, { error: 'method not allowed' }); return; }
+  const declared = parseInt(req.headers['content-length'] || '0', 10);
+  if (declared > MAX_SAVE_BYTES) { saveReply(res, 413, { error: 'save too large' }); req.resume(); return; }
+  const chunks = []; let size = 0, aborted = false;
+  req.on('data', (c) => {
+    if (aborted) return; size += c.length;
+    if (size > MAX_SAVE_BYTES) { aborted = true; saveReply(res, 413, { error: 'save too large' }); req.resume(); return; }
+    chunks.push(c);
+  });
+  req.on('end', () => {
+    if (aborted) return;
+    let data; try { data = JSON.parse(Buffer.concat(chunks).toString('utf8')); } catch (_) { saveReply(res, 400, { error: 'invalid JSON' }); return; }
+    if (!data || typeof data !== 'object' || Array.isArray(data) || !data.v) { saveReply(res, 400, { error: 'not a VoxCraft save' }); return; }
+    const tmp = file + '.' + crypto.randomBytes(4).toString('hex') + '.tmp';
+    fs.writeFile(tmp, JSON.stringify(data), (err) => {
+      if (err) { saveReply(res, 500, { error: 'write failed' }); return; }
+      fs.rename(tmp, file, (err2) => saveReply(res, err2 ? 500 : 200, err2 ? { error: 'write failed' } : { ok: true }));
+    });
+  });
+}
+
 const server = http.createServer((req, res) => {
+  const saveMatch = /\/saves\/([A-Za-z0-9_-]{1,40})\/?(?:\?|$)/.exec(req.url);
+  if (saveMatch) { handleSave(req, res, saveMatch[1]); return; }
+  if (/\/saves(?:\/|\?|$)/.test(req.url)) { saveReply(res, 400, { error: 'invalid save slot' }); return; }
   if (req.url.startsWith('/status')) {
     res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
     res.end(JSON.stringify({ ok: true, online: online.size, players: Object.keys(db.profiles).length, edits: db.edits.size, homes: db.homes.filter(Boolean).length }));
